@@ -1,60 +1,69 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [categories, setCategories] = useState([]);
+  const [user, setUser] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        supabase
-          .from("users")
-          .select("*")
-          .eq("email", data.session.user.email)
-          .single()
-          .then(({ data }) => setUser(data));
-      }
-    });
-  }, []);
+    const loadData = async () => {
+      // Check login
+      const { data } = await supabase.auth.getUser();
 
-  if (!user) return <p>Loading dashboard...</p>;
+      if (!data.user) {
+        router.push("/auth/login");
+        return;
+      }
+
+      setUser(data.user);
+
+      // Get categories with event count
+      const { data: categoryData } = await supabase
+        .from("categories")
+        .select(`
+          id,
+          name,
+          events(count)
+        `);
+
+      setCategories(categoryData || []);
+    };
+
+    loadData();
+  }, [router]);
+
+  if (!user) return <p className="text-center mt-10">Loading...</p>;
 
   return (
-    <div className="p-8 min-h-screen bg-zinc-50 dark:bg-black text-black dark:text-white">
-      <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
-      <p>Welcome, {user.name}</p>
+    <div className="min-h-screen p-10 bg-zinc-50 dark:bg-black">
+      <h1 className="text-3xl font-bold mb-6 text-black dark:text-white">
+        Welcome, {user.email}
+      </h1>
 
-      {user.role_id === 5 && (
-        <div>
-          <h2 className="text-2xl font-semibold mt-4">Admin Panel</h2>
-          <ul>
-            <li><Link href="/events/manage" className="underline">Manage Events</Link></li>
-            <li><Link href="/users" className="underline">Manage Users</Link></li>
-            <li><Link href="/analytics" className="underline">View Analytics</Link></li>
-          </ul>
-        </div>
-      )}
+      <h2 className="text-2xl font-semibold mb-4 text-black dark:text-white">
+        Event Categories
+      </h2>
 
-      {user.role_id === 6 && (
-        <div>
-          <h2 className="text-2xl font-semibold mt-4">Organizer Panel</h2>
-          <ul>
-            <li><Link href="/events/manage" className="underline">My Events</Link></li>
-          </ul>
-        </div>
-      )}
-
-      {user.role_id === 7 && (
-        <div>
-          <h2 className="text-2xl font-semibold mt-4">User Panel</h2>
-          <ul>
-            <li><Link href="/events" className="underline">Browse Events</Link></li>
-            <li><Link href="/bookings" className="underline">My Bookings</Link></li>
-          </ul>
-        </div>
-      )}
+      <div className="grid grid-cols-3 gap-6">
+        {categories.map((cat) => (
+          <div
+            key={cat.id}
+            onClick={() => router.push(`/categories/${cat.id}`)}
+            className="p-6 bg-white dark:bg-zinc-900 rounded shadow cursor-pointer hover:scale-105 transition"
+          >
+            <h3 className="text-xl font-semibold text-black dark:text-white">
+              {cat.name}
+            </h3>
+            <p className="text-gray-500">
+              {cat.events?.[0]?.count || 0} events
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

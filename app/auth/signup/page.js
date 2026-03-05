@@ -26,7 +26,7 @@ export default function Signup() {
     if (data.user) {
       // 2️⃣ Insert profile info in your users table
       await supabase.from("users").insert({
-        id: data.user.id,
+        // id: data.user.id,
         email,
         name: email.split("@")[0],
         role_id: 7,
