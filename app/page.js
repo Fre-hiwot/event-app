@@ -1,8 +1,27 @@
-export default function Home() {
+import { supabase } from "../lib/supabase";
+
+export default async function Home() {
+  const { data: events } = await supabase
+    .from("events")
+    .select("*")
+    .limit(3);
+
   return (
-    <div>
-      <h1>Event Booking System</h1>
-      <a href="/events">Browse Events</a>
-    </div>
+    <main>
+      <h1>Welcome to Event App 🎉</h1>
+
+      <a href="/auth/login">Login</a>
+      <a href="/auth/signup">Sign Up</a>
+
+      <h2>Featured Events</h2>
+
+      {events?.map((event) => (
+        <div key={event.id}>
+          <h3>{event.title}</h3>
+        </div>
+      ))}
+
+      <a href="/events">View All Events</a>
+    </main>
   );
 }
