@@ -87,6 +87,7 @@ export default function AdminDashboard() {
     { name: "Notifications", href: "/dashboard/admin/notifications", icon: <FaBell size={30} /> },
     { name: "System Settings", href: "/dashboard/admin/settings", icon: <FaCog size={30} /> },
     { name: "Activity Logs", href: "/dashboard/admin/logs", icon: <FaFileAlt size={30} /> },
+    { name: "Organizer Management", href: "/dashboard/admin/organizer", icon: <FaUsers size={30} /> },
   ];
 
   return (
