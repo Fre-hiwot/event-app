@@ -33,7 +33,7 @@ export default function AdminEvents() {
             <th className="p-3 border">Title</th>
             <th className="p-3 border">Date</th>
             <th className="p-3 border">Price</th>
-            <th className="p-3 border">Actions</th>
+            {/* <th className="p-3 border">Actions</th> */}
           </tr>
         </thead>
         <tbody>
@@ -43,9 +43,9 @@ export default function AdminEvents() {
               <td className="p-3 border">{e.title}</td>
               <td className="p-3 border">{e.date}</td>
               <td className="p-3 border">{e.price}</td>
-              <td className="p-3 border">
-                <button onClick={() => deleteEvent(e.id)} className="bg-red-600 text-white px-3 py-1 rounded">Delete</button>
-              </td>
+              {/* <td className="p-3 border">
+                <button onClick={() => deleteEvent(e.id)} className="bg-red-600 text-black px-3 py-1 rounded">Delete</button>
+              </td> */}
             </tr>
           ))}
         </tbody>

@@ -45,7 +45,7 @@ export default function AdminUsers() {
             <th className="p-3 border">Email</th>
             <th className="p-3 border">Role</th>
             <th className="p-3 border">Status</th>
-            <th className="p-3 border">Actions</th>
+            {/* <th className="p-3 border">Actions</th> */}
           </tr>
         </thead>
         <tbody>
@@ -57,9 +57,9 @@ export default function AdminUsers() {
               <td className="p-3 border">{u.role_id}</td>
               <td className="p-3 border">{u.status || "active"}</td>
               <td className="p-3 border">
-                <button onClick={() => deleteUser(u.id)} className="bg-red-600 text-white px-3 py-1 rounded">
+                {/* <button onClick={() => deleteUser(u.id)} className="bg-red-600 text-black px-3 py-1 rounded">
                   Delete
-                </button>
+                </button> */}
               </td>
             </tr>
           ))}

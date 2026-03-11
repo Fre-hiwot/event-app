@@ -105,7 +105,7 @@ export default function ManageOrganizers() {
           className="border p-2 rounded"
         />
 
-        <button className="bg-green-600 text-white p-2 rounded">
+        <button className="bg-green-600 text-black p-2 rounded">
           Add Organizer
         </button>
 
@@ -139,10 +139,16 @@ export default function ManageOrganizers() {
 
                   <button
                     onClick={()=>deleteOrganizer(org.id)}
-                    className="bg-red-500 text-white px-3 py-1 rounded"
+                    className="bg-red-500 text-black px-3 py-1 rounded"
                   >
                     Delete
                   </button>
+                  {/* <button
+                    onClick={()=>editOrganizer(org.id)}
+                    className="bg-red-500 text-black px-3 py-1 rounded"
+                  >
+                    edit
+                  </button> */}
 
                 </td>
 
