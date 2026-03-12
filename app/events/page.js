@@ -1,55 +1,104 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { useParams } from "next/navigation";
 
-export default function EventDetails() {
-  const { id } = useParams();
-  const [event, setEvent] = useState(null);
+export default function EventsPage() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchEvent() {
-      const { data } = await supabase
-        .from("events")
-        .select("*")
-        .eq("id", id)
-        .single();
+    fetchEvents();
+  }, []);
 
-      setEvent(data);
+  async function fetchEvents() {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id, title, description, location, date, price, category_id");
+
+    if (error) {
+      console.error("Error fetching events:", error);
+      setEvents([]);
+    } else {
+      setEvents(data || []);
     }
-    fetchEvent();
-  }, [id]);
+    setLoading(false);
+  }
 
-  const handleBooking = async () => {
-    const res = await fetch("/api/booking-workflow", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: 1,
-        event_id: id,
-        ticket_quantity: 1,
-      }),
-    });
+  const bookEvent = async (eventId, ticketQuantity) => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (!user || authError) return alert("User not logged in");
 
-    const data = await res.json();
+    // Fetch profile
+   const { data: profile, error: profileError } = await supabase
+  .from("users")
+  .select("id")
+  .eq("auth_id", user.id)
+  .maybeSingle();
 
-    if (data.booking) {
-      window.location.href = `/ticket/${data.booking.id}`;
+if (!profile || profileError) {
+  console.error(profileError);
+  return alert("User profile not found.");
+}
+
+// Insert booking with integer user ID
+const { error } = await supabase.from("bookings").insert([
+  {
+    user_id: profile.id,      // <- integer ID from users table
+    event_id: event.id,
+    ticket_quantity: tickets
+  }
+]);
+
+    if (error) {
+      console.error("Booking error:", error);
+      alert("Booking failed: " + (error.message || JSON.stringify(error)));
+    } else {
+      alert(`Successfully booked ${ticketQuantity} ticket(s)!`);
     }
   };
 
-  if (!event) return <p>Loading...</p>;
+  if (loading) return <p className="p-6">Loading events...</p>;
 
   return (
-    <div>
-      <h1>{event.title}</h1>
-      <p>{event.description}</p>
-      <p>Price: {event.price}</p>
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6">Browse Events</h1>
 
-      <button onClick={handleBooking}>Book Now</button>
+      {events.length === 0 ? (
+        <p>No events available.</p>
+      ) : (
+        <div className="grid md:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <div key={event.id} className="border p-4 rounded shadow bg-white flex flex-col gap-2">
+              <h2 className="text-xl font-bold">{event.title}</h2>
+              <p className="text-gray-600">{event.description}</p>
+              <p className="text-gray-600">Location: {event.location}</p>
+              <p className="text-gray-600">Date: {new Date(event.date).toLocaleDateString()}</p>
+              <p className="text-gray-800 font-semibold">Price: ${event.price}</p>
+
+              {/* Ticket quantity input */}
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="number"
+                  min="1"
+                  defaultValue="1"
+                  id={`ticket-quantity-${event.id}`}
+                  className="border p-1 rounded w-20"
+                />
+                <button
+                  onClick={() => {
+                    const qty = document.getElementById(`ticket-quantity-${event.id}`).value;
+                    bookEvent(event.id, qty);
+                  }}
+                  className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600"
+                >
+                  Book
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

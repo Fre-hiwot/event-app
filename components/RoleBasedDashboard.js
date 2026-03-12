@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 
 import AdminDashboard from "../app/dashboard/admin/page";
 import OrganizerDashboard from "../app/dashboard/organizer/page";
-//import UserDashboard from "../app/dashboard/user/page";
+import UserDashboard from "../app/dashboard/user/page";
 
 export default function RoleBasedDashboard() {
 
