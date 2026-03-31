@@ -1,0 +1,54 @@
+.container {
+  padding: 20px;
+}
+
+.hero {
+  padding: 20px;
+  text-align: center;
+}
+
+.heroTitle {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.heroText {
+  margin-top: 10px;
+  color: gray;
+}
+
+.highlights {
+  margin-top: 20px;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+.highlightGrid {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.card {
+  flex: 1;
+  background: white;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: 0.3s;
+  min-width: 200px;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.cardImage {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+}

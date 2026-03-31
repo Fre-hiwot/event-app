@@ -1,37 +1,52 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "../../../lib/supabase";
 
-export default function OrganizerDashboard() {
+export default function OrganizerEvents() {
+
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  async function fetchEvents() {
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("organizer_id", user.id);
+
+    if (error) {
+      console.log(error);
+    } else {
+      setEvents(data);
+    }
+  }
+
   return (
-    <div className="p-6">
+    <div>
+      <h1>My Events</h1>
 
-      <h1 className="text-3xl font-bold mb-6">Organizer Dashboard</h1>
+      <a href="/dashboard/organizer/events/create">
+        <button>Create Event</button>
+      </a>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      {events.map((event) => (
+        <div key={event.id}>
+          <h3>{event.title}</h3>
+          <p>{event.description}</p>
 
-        <Link
-          href="/dashboard/organizer/events"
-          className="bg-blue-50 black text-black p-6 rounded shadow hover:bg-blue-600"
-        >
-          Manage My Events
-        </Link>
+          <a href={`/dashboard/organizer/events/edit/${event.id}`}>
+            <button>Edit</button>
+          </a>
 
-        <Link
-          href="/dashboard/organizer/events/create"
-          className="bg-green-500 text-black p-6 rounded shadow hover:bg-green-600"
-        >
-          Create New Event
-        </Link>
-
-        <Link
-          href="/dashboard/organizer/categories"
-          className="bg-purple-500 text-black p-6 rounded shadow hover:bg-purple-600"
-        >
-          View Categories
-        </Link>
-
-      </div>
+          <button>Delete</button>
+        </div>
+      ))}
 
     </div>
   );

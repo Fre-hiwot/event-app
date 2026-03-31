@@ -2,151 +2,188 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
-import Link from "next/link";
 
 export default function UserDashboard() {
   const [categories, setCategories] = useState([]);
+  const [eventCounts, setEventCounts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   useEffect(() => {
     fetchCategories();
-    fetchEvents();
   }, []);
 
-  // Fetch all categories
   async function fetchCategories() {
-    const { data, error } = await supabase.from("categories").select("*");
-    if (error) return console.error("Error fetching categories:", error);
-    setCategories(data || []);
-  }
+    try {
+      setLoading(true);
+      const catRes = await fetch("/api/categories/get");
+      const catResult = await catRes.json();
+      const categoriesData = catResult.categories || [];
 
-  // Fetch all events
-  async function fetchEvents() {
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) return console.error("Error fetching events:", error);
-    setEvents(data || []);
-  }
+      const eventRes = await fetch("/api/events/get");
+      const eventResult = await eventRes.json();
+      const eventsData = eventResult.events || [];
 
-  async function bookEvent(event) {
-    const tickets = prompt(`Enter the number of tickets for "${event.title}":`, "1");
-    if (!tickets || isNaN(tickets) || parseInt(tickets) <= 0)
-      return alert("Invalid ticket quantity.");
+      const counts = {};
+      eventsData.forEach(e => {
+        counts[e.category_id] = (counts[e.category_id] || 0) + 1;
+      });
 
-    const ticketCount = parseInt(tickets);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("You must be logged in to book.");
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_id", user.id)
-      .maybeSingle();
-    if (!profile) return alert("User profile not found.");
-
-    const { error } = await supabase.from("bookings").insert([
-      {
-        user_id: profile.id,
-        event_id: event.id,
-        tickets: ticketCount,
-        total_price: ticketCount * event.price
-      }
-    ]);
-
-    if (error) {
-      console.error("Booking error:", error);
-      alert("Booking failed: " + error.message);
-    } else {
-      alert(`Successfully booked ${ticketCount} ticket(s) for "${event.title}"!`);
+      setCategories(categoriesData);
+      setEventCounts(counts);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setCategories([]);
+      setEventCounts({});
+      setLoading(false);
     }
   }
 
+  async function handleCategoryClick(catId) {
+    if (selectedCategory === catId) {
+      setSelectedCategory(null);
+      setEvents([]);
+      return;
+    }
+
+    setSelectedCategory(catId);
+    setEvents([]);
+    setEventsLoading(true);
+
+    try {
+      const res = await fetch(`/api/events/get?category_id=${catId}`);
+      const result = await res.json();
+      setEvents(result.events || []);
+      setEventsLoading(false);
+    } catch (err) {
+      console.error(err);
+      setEvents([]);
+      setEventsLoading(false);
+    }
+  }
+
+  async function handleBook(eventId) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        alert("You must be logged in to book an event.");
+        return;
+      }
+
+      const quantityStr = prompt("How many tickets do you need?", "1");
+      if (!quantityStr) return;
+
+      const quantity = parseInt(quantityStr);
+      if (isNaN(quantity) || quantity <= 0) {
+        alert("Invalid number of tickets.");
+        return;
+      }
+
+      const bookingRes = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ event_id: eventId, tickets: quantity }),
+      });
+
+      const bookingData = await bookingRes.json();
+      if (!bookingRes.ok) return alert(bookingData.error || "Booking failed");
+
+      const bookingId = bookingData.booking.id;
+      alert("Booking created with status: pending");
+
+      const paymentRes = await fetch("/api/payments/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+
+      const paymentData = await paymentRes.json();
+      if (!paymentRes.ok) return alert(paymentData.error || "Payment creation failed");
+
+      const paymentId = paymentData.payment.id;
+      alert("Payment created with status: pending");
+
+      const success = confirm("Simulate payment success? OK = success, Cancel = failed");
+
+      const confirmRes = await fetch("/api/payments/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ payment_id: paymentId, success }),
+      });
+
+      const confirmData = await confirmRes.json();
+      if (confirmRes.ok) {
+        alert(`Payment ${success ? "successful" : "failed"}.\nBooking status updated accordingly.`);
+      } else {
+        alert(confirmData.error || "Payment confirmation failed");
+      }
+    } catch (err) {
+      alert("Booking/payment process failed: " + err.message);
+    }
+  }
+
+  if (loading) return <p className="loadingText">Loading categories...</p>;
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Browse Events by Category</h1>
-        <div className="flex gap-4">
-          <Link
-            href="/dashboard/user/bookings"
-            className="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600"
-          >
-            My Bookings
-          </Link>
-          <Link
-            href="/dashboard/user/profile"
-            className="bg-purple-500 text-white px-4 py-2 rounded shadow hover:bg-purple-600"
-          >
-            Profile
-          </Link>
-        </div>
-      </div>
+    <div className="userDashboardContainer">
+      <h1 className="dashboardTitle">Event Categories</h1>
 
-      {/* Categories with Events */}
-      {categories.length === 0 ? (
-        <p>No categories found.</p>
-      ) : (
-        categories.map((cat) => {
-          const catEvents = events.filter((e) => e.category_id === cat.id);
-          return (
-            <div key={cat.id} className="mb-8">
-              <h2 className="text-2xl font-semibold mb-4">{cat.name}</h2>
-              {catEvents.length === 0 ? (
-                <p className="text-gray-500 mb-4">No events in this category.</p>
-              ) : (
-                <div className="grid md:grid-cols-3 gap-6">
-                  {catEvents.map((event) => (
-                    <div key={event.id} className="bg-white p-4 rounded shadow">
-                      <h3 className="text-xl font-bold mb-2">{event.title}</h3>
-                      <p className="text-gray-600 mb-1">{event.location}</p>
-                      <p className="text-gray-600 mb-1">
-                        {new Date(event.date).toLocaleDateString()}
-                      </p>
-                      <p className="text-gray-800 font-semibold mb-2">${event.price}</p>
+      <div className="categoriesGrid">
+        {categories.map(cat => (
+          <div key={cat.id} className="categoryWrapper">
+            <div
+              onClick={() => handleCategoryClick(cat.id)}
+              className="categoryCard"
+              
+            >
+              
+              <h2 className="categoryName">{cat.name}</h2>
+              <p className="categoryEventCount">{eventCounts[cat.id] || 0} Events</p>
+            </div>
 
+            {selectedCategory === cat.id && (
+              <div className="eventsGrid">
+                {eventsLoading ? (
+                  <p className="loadingText">Loading events...</p>
+                ) : events.length === 0 ? (
+                  <p className="noEventsText">No events in this category.</p>
+                ) : (
+                  events.map(event => (
+                    <div key={event.id} className="eventCard">
+                      <h3 className="eventTitle">{event.title}</h3>
+                      <p className="eventDate">{event.date}</p>
+                      <p className="eventLocation">{event.location}</p>
+                      <p className="eventDescription">{event.description}</p>
                       <button
-                        onClick={() => setSelectedEvent(event)}
-                        className="bg-gray-500 text-white px-4 py-2 rounded shadow hover:bg-gray-600 mr-2"
+                        onClick={() => handleBook(event.id)}
+                        className="bookButton"
                       >
-                        Details
-                      </button>
-
-                      <button
-                        onClick={() => bookEvent(event)}
-                        className="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600"
-                      >
-                        Book Now
+                        Book
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-
-      {/* Modal for Event Details */}
-      {selectedEvent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded p-6 max-w-lg w-full relative">
-            <h2 className="text-2xl font-bold mb-4">{selectedEvent.title}</h2>
-            <p className="mb-4">{selectedEvent.description || "No description available."}</p>
-            <p className="text-gray-600 mb-2">Location: {selectedEvent.location}</p>
-            <p className="text-gray-600 mb-2">
-              Date: {new Date(selectedEvent.date).toLocaleDateString()}
-            </p>
-            <p className="text-gray-800 font-semibold mb-4">Price: ${selectedEvent.price}</p>
-            <button
-              onClick={() => setSelectedEvent(null)}
-              className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-            >
-              Close
-            </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

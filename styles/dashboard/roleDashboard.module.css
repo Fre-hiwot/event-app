@@ -1,0 +1,78 @@
+/* roleDashboard.module.css */
+
+/* Wrapper container */
+.dashboardContainer {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;        /* ensure full width */
+  max-width: 100%;    /* prevent overflow */
+
+}
+
+/* Sidebar styling */
+.sidebar {
+  width: 16rem; /* 256px, Tailwind 64 */
+  color: white;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: rgb(1, 1, 22);
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Sidebar Banner */
+.sidebarBanner {
+  width: 100%;
+  height: 7rem;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Sidebar text */
+.sidebarTitle {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+.sidebarGreeting {
+  margin-bottom: 1.5rem;
+}
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.navLink {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.2s;
+}
+.navLink:hover {
+  background-color: #374151; /* Tailwind gray-700 */
+}
+.activeLink {
+  background-color: #374151; /* same as hover */
+  font-weight: 600;
+}
+.navLink:hover,
+.activeLink {
+  background-color: #374151;
+}
+.navIcon {
+  margin-right: 0.5rem; /* space between icon and text */
+  vertical-align: middle;
+}
+
+/* Main dashboard content */
+.mainContent {
+  flex: 1; /* takes remaining width */
+  background-color: white; /* Tailwind gray-900 */
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+

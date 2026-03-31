@@ -2,51 +2,281 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import styles from "../styles/dashboard/roleDashboard.module.css";
+import {
+  Home,
+  Users,
+  Calendar,
+  CreditCard,
+  FileText,
+  Settings,
+  Info,
+  Phone,
+  Folder,
+} from "lucide-react";
 
-import AdminDashboard from "../app/dashboard/admin/page";
-import OrganizerDashboard from "../app/dashboard/organizer/page";
-import UserDashboard from "../app/dashboard/user/page";
+export default function RoleBasedDashboard({ children }) {
+  const [profile, setProfile] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const pathname = usePathname();
 
-export default function RoleBasedDashboard() {
-
-  const [roleId, setRoleId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // ✅ FIXED ACTIVE LOGIC
+  const isActive = (href) => {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(href + "/");
+  };
 
   useEffect(() => {
-    getUserRole();
+    fetchUserProfile();
   }, []);
 
-  async function getUserRole() {
+  async function fetchUserProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const { data: profile, error } = await supabase
+    const { data: profileData, error } = await supabase
       .from("users")
-      .select("role_id")
-      .eq("email", user.email)
-      .single();
+      .select("id, name, role_id")
+      .eq("auth_id", user.id)
+      .maybeSingle();
 
-    if (error) {
-      console.error(error);
-      setLoading(false);
-      return;
-    }
-
-    setRoleId(profile.role_id);
-    setLoading(false);
+    if (error) console.error("Profile fetch error:", error);
+    else setProfile(profileData);
   }
 
-  if (loading) return <p>Loading dashboard...</p>;
+  if (!profile) return <p>Loading dashboard...</p>;
 
-  // Role Routing
-  if (roleId === 5) return <AdminDashboard />;
-  if (roleId === 6) return <OrganizerDashboard />;
-  if (roleId === 7) return <UserDashboard />;
+  return (
+    <div className={styles.dashboardContainer}>
+      {/* Sidebar */}
+      <aside className={styles.sidebar}>
+        <div
+          className={styles.sidebarBanner}
+          style={{ backgroundImage: "url('/images/dashboard.jpg')" }}
+        ></div>
 
-  return <p>Access Denied</p>;
+        <h2 className={styles.sidebarTitle}>Dashboard</h2>
+        <p className={styles.sidebarGreeting}>Hello, {profile.name}</p>
+
+        <nav className={styles.sidebarNav}>
+          {/* Admin */}
+          {profile.role_id === 5 && (
+            <>
+              <Link
+                href="/dashboard/admin/overview"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/admin/overview") ? styles.activeLink : ""
+                }`}
+              >
+                <Home size={18} className={styles.navIcon} /> Dashboard Overview
+              </Link>
+
+              <Link
+                href="/dashboard/admin/audit"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/admin/audit") ? styles.activeLink : ""
+                }`}
+              >
+                <FileText size={18} className={styles.navIcon} /> Audit & Logs
+              </Link>
+
+              <Link
+                href="/bookings"
+                className={`${styles.navLink} ${
+                  isActive("/bookings") ? styles.activeLink : ""
+                }`}
+              >
+                <Calendar size={18} className={styles.navIcon} /> Booking & Transactions
+              </Link>
+
+              <Link
+                href="/category"
+                className={`${styles.navLink} ${
+                  isActive("/category") ? styles.activeLink : ""
+                }`}
+              >
+                <Folder size={18} className={styles.navIcon} /> Event & Category Management
+              </Link>
+
+              <Link
+                href="/dashboard/featuredEvent"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/featuredEvent") ? styles.activeLink : ""
+                }`}
+              >
+                <Calendar size={18} className={styles.navIcon} /> Manage Featured Events
+              </Link>
+
+              <Link
+                href="/dashboard/admin/users"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/admin/users") ? styles.activeLink : ""
+                }`}
+              >
+                <Users size={18} className={styles.navIcon} /> User & Role Management
+              </Link>
+
+              <Link
+                href="/payments"
+                className={`${styles.navLink} ${
+                  isActive("/payments") ? styles.activeLink : ""
+                }`}
+              >
+                <CreditCard size={18} className={styles.navIcon} /> Payment History
+              </Link>
+
+              {/* Settings */}
+              <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className={styles.settingsButton}
+              >
+                <Settings size={18} className={styles.navIcon} /> Settings{" "}
+                <span>{settingsOpen ? "▲" : "▼"}</span>
+              </button>
+
+              {settingsOpen && (
+                <div className={styles.settingsItems}>
+                  <Link
+                    href="/dashboard/admin/profile"
+                    className={`${styles.navLink} ${
+                      isActive("/dashboard/admin/profile") ? styles.activeLink : ""
+                    }`}
+                  >
+                    <Users size={16} className={styles.navIcon} /> Profile & Account
+                  </Link>
+
+                  <Link
+                    href="/dashboard/admin/support"
+                    className={`${styles.navLink} ${
+                      isActive("/dashboard/admin/support") ? styles.activeLink : ""
+                    }`}
+                  >
+                    <Phone size={16} className={styles.navIcon} /> Support & Feedback
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Organizer */}
+          {profile.role_id === 6 && (
+            <>
+              <Link
+                href="/category"
+                className={`${styles.navLink} ${
+                  isActive("/category") ? styles.activeLink : ""
+                }`}
+              >
+                <Folder size={18} className={styles.navIcon} /> My Events & Categories
+              </Link>
+
+              <Link
+                href="/bookings"
+                className={`${styles.navLink} ${
+                  isActive("/bookings") ? styles.activeLink : ""
+                }`}
+              >
+                <Calendar size={18} className={styles.navIcon} /> My Bookings
+              </Link>
+
+
+              {/* ✅ New: Featured Events Management */}
+              <Link
+                href="/dashboard/featuredEvent"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/featuredEvent") ? styles.activeLink : ""
+                }`}
+              >
+                <Calendar size={18} className={styles.navIcon} /> Manage Featured Events
+              </Link>
+
+              <Link
+                href="/payments"
+                className={`${styles.navLink} ${
+                  isActive("/payments") ? styles.activeLink : ""
+                }`}
+              >
+                <CreditCard size={18} className={styles.navIcon} /> Payment History
+              </Link>
+
+              <Link
+                href="/dashboard/organizer/profile"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/organizer/profile") ? styles.activeLink : ""
+                }`}
+              >
+                <Users size={18} className={styles.navIcon} /> My Profile
+              </Link>
+            </>
+          )}
+
+          {/* User */}
+          {profile.role_id === 7 && (
+            <>
+              <Link
+                href="/dashboard/user"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/user") ? styles.activeLink : ""
+                }`}
+              >
+                <Home size={18} className={styles.navIcon} /> Browse Events
+              </Link>
+
+              <Link
+                href="/bookings"
+                className={`${styles.navLink} ${
+                  isActive("/bookings") ? styles.activeLink : ""
+                }`}
+              >
+                <Calendar size={18} className={styles.navIcon} /> My Bookings
+              </Link>
+
+              <Link
+                href="/payments"
+                className={`${styles.navLink} ${
+                  isActive("/payments") ? styles.activeLink : ""
+                }`}
+              >
+                <CreditCard size={18} className={styles.navIcon} /> Payment History
+              </Link>
+
+              <Link
+                href="/dashboard/user/profile"
+                className={`${styles.navLink} ${
+                  isActive("/dashboard/user/profile") ? styles.activeLink : ""
+                }`}
+              >
+                <Users size={18} className={styles.navIcon} /> My Profile
+              </Link>
+
+              <Link
+                href="/about"
+                className={`${styles.navLink} ${
+                  isActive("/about") ? styles.activeLink : ""
+                }`}
+              >
+                <Info size={18} className={styles.navIcon} /> About
+              </Link>
+
+              <Link
+                href="/contact"
+                className={`${styles.navLink} ${
+                  isActive("/contact") ? styles.activeLink : ""
+                }`}
+              >
+                <Phone size={18} className={styles.navIcon} /> Contact
+              </Link>
+            </>
+          )}
+        </nav>
+      </aside>
+
+      {/* Main */}
+      <main className={styles.mainContent}>{children}</main>
+    </div>
+  );
 }

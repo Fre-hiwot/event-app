@@ -1,0 +1,79 @@
+.pageContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(to right, #1f2937, #1f2937);
+  padding: 2rem;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.signupCard {
+  background: white;
+  padding: 3rem 2rem;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.inputField {
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.3s;
+}
+
+.inputField:focus {
+  border-color: #667eea;
+}
+
+.signupButton {
+  width: 100%;
+  padding: 0.8rem;
+  background-color: #667eea;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s;
+}
+
+.signupButton:hover {
+  background-color: #1f2937;
+  transform: scale(1.03);
+}
+
+.message {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: green;
+}
+
+.goToLoginButton {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.8rem;
+  background-color: #333;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.goToLoginButton:hover {
+  background-color: #555;
+}
