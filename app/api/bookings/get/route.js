@@ -59,7 +59,9 @@ export async function GET(req) {
           title,
           location,
           date,
-          price
+          price-regular,
+          price-vip,
+          price-vvip
         )
       `)
       .eq("user_id", profile.id)

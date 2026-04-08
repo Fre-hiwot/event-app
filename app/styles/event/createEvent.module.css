@@ -1,0 +1,49 @@
+.event-add-container {
+  padding: 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.event-add-title {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+
+.event-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-input,
+.event-textarea {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+}
+
+.event-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.event-add-button {
+  background-color: #16a34a;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.event-add-button:hover {
+  background-color: #15803d;
+}
+
+.event-loading {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}

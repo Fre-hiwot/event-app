@@ -7,7 +7,6 @@ export async function POST(req) {
   try {
     const authHeader = req.headers.get("authorization");
 
-    // 🔐 Unauthorized
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       await auditLogger({
         user_id: null,
@@ -21,7 +20,7 @@ export async function POST(req) {
 
     const token = authHeader.split(" ")[1];
 
-    // Get user from token
+    // Verify user token
     const {
       data: { user },
       error: authError,
@@ -38,7 +37,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Get profile (system user id)
+    // Get internal user ID
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -57,9 +56,8 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { event_id, tickets } = body;
+    const { event_id, tickets, ticket_type } = body;
 
-    // ✅ Validation
     if (!event_id || tickets == null || tickets <= 0) {
       await auditLogger({
         user_id: profile.id,
@@ -74,11 +72,16 @@ export async function POST(req) {
       );
     }
 
-    // Get event price
+    const eventIdNum = parseInt(event_id, 10);
+    if (isNaN(eventIdNum)) {
+      return NextResponse.json({ error: "Invalid event_id" }, { status: 400 });
+    }
+
+    // Fetch event info
     const { data: event, error: eventError } = await supabase
       .from("events")
-      .select("title, price")
-      .eq("id", event_id)
+      .select("title, price_regular, price_vip, price_vvip")
+      .eq("id", eventIdNum)
       .single();
 
     if (eventError || !event) {
@@ -86,25 +89,40 @@ export async function POST(req) {
         user_id: profile.id,
         action_type: "create_failed",
         object_type: "booking",
-        object_name: `Event ${event_id}`,
-        details: `Event ${event_id} not found`,
+        object_name: `Event ${eventIdNum}`,
+        details: `Event not found`,
       });
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Calculate total
-    const total_price = event.price * tickets;
+    // Determine price
+    let pricePerTicket;
+    switch (ticket_type) {
+      case "vip":
+        pricePerTicket = event.price_vip ?? 0;
+        break;
+      case "vvip":
+        pricePerTicket = event.price_vvip ?? 0;
+        break;
+      default:
+        pricePerTicket = event.price_regular ?? 0;
+    }
 
-    // 1️⃣ Create booking (pending)
+    const total_price = pricePerTicket * tickets;
+
+    // Set booking status: free → confirmed, paid → pending
+    const bookingStatus = total_price === 0 ? "confirmed" : "pending";
+
+    // Create booking
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .insert([
         {
           user_id: profile.id,
-          event_id,
+          event_id: eventIdNum,
           tickets,
           total_price,
-          status: "pending",
+          status: bookingStatus,
         },
       ])
       .select()
@@ -133,52 +151,58 @@ export async function POST(req) {
       );
     }
 
-    // 2️⃣ Create payment (pending)
-    const { data: payment, error: paymentError } = await supabase
-      .from("payments")
-      .insert([
-        {
-          booking_id: booking.id,
-          amount: total_price,
-          status: "pending",
-        },
-      ])
-      .select()
-      .single();
+    let payment = null;
 
-    if (paymentError) {
-      // rollback booking if payment fails ❗
-      await supabase
-        .from("bookings")
-        .delete()
-        .eq("id", booking.id);
+    // Only create payment if not free
+    if (total_price > 0) {
+      const { data: paymentData, error: paymentError } = await supabase
+        .from("payments")
+        .insert([
+          {
+            booking_id: booking.id,
+            amount: total_price,
+            status: "pending",
+          },
+        ])
+        .select()
+        .single();
 
-      await auditLogger({
-        user_id: profile.id,
-        action_type: "create_failed",
-        object_type: "payment",
-        object_name: event.title,
-        details: paymentError.message,
-      });
+      if (paymentError) {
+        // rollback booking
+        await supabase.from("bookings").delete().eq("id", booking.id);
 
-      return NextResponse.json(
-        { error: "Failed to create payment" },
-        { status: 500 }
-      );
+        await auditLogger({
+          user_id: profile.id,
+          action_type: "create_failed",
+          object_type: "payment",
+          object_name: event.title,
+          details: paymentError.message,
+        });
+
+        return NextResponse.json(
+          { error: "Failed to create payment" },
+          { status: 500 }
+        );
+      }
+
+      payment = paymentData;
     }
 
-    // ✅ Success log
+    // Success log
     await auditLogger({
       user_id: profile.id,
       action_type: "create",
       object_type: "booking",
       object_name: event.title,
-      details: `Booking created (pending payment) for '${event.title}'`,
+      details: `Booking created (${bookingStatus}) for '${event.title}'`,
     });
 
     return NextResponse.json(
       {
-        message: "Booking created. Awaiting payment.",
+        message:
+          total_price === 0
+            ? "Booking confirmed! No payment needed."
+            : "Booking created. Awaiting payment.",
         booking,
         payment,
       },

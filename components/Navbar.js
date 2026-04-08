@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./Navbar.module.css";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   let links = [];
+  let showBack = false;
 
   // 🔥 Define links per page
   if (pathname === "/") {
@@ -28,10 +30,8 @@ export default function Navbar() {
       { href: "/about", label: "About" },
     ];
   } else {
-    // default (optional)
-    links = [
-      { href: "/", label: "Home" },
-    ];
+    // 🔥 For ALL other pages → show back button
+    showBack = true;
   }
 
   return (
@@ -40,11 +40,20 @@ export default function Navbar() {
         <h1 className={styles.logo}>Event App 🎉</h1>
 
         <div className={styles.navLinks}>
-          {links.map((link) => (
-            <Link key={link.href} href={link.href}>
-              {link.label}
-            </Link>
-          ))}
+          {showBack ? (
+            <button
+              onClick={() => router.back()}
+              className={styles.backButton}
+            >
+              ← Back
+            </button>
+          ) : (
+            links.map((link) => (
+              <Link key={link.href} href={link.href}>
+                {link.label}
+              </Link>
+            ))
+          )}
         </div>
       </nav>
     </header>

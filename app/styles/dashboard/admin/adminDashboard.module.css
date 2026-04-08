@@ -1,0 +1,137 @@
+/* adminDashboard.module.css */
+
+/* Container */
+.dashboardContainer {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+/* Export Button */
+.dashboardExportButton {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+.dashboardExportButton:hover {
+  background-color: #218838;
+}
+
+/* Dashboard Content */
+.dashboardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Titles */
+.dashboardTitle {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.dashboardSectionTitle {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 32px;
+  margin-bottom: 16px;
+}
+
+/* Stats Cards */
+.dashboardStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.dashboardCard {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.dashboardCardTitle {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.dashboardCardValue {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #444;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+/* Table inside cards */
+.eventsTableContainer {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.eventsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.eventsTable th,
+.eventsTable td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.eventsTable th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+.eventsTable tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* Filters */
+.dashboardFilters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dashboardFilterSelect {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+/* Charts */
+.dashboardBarChart, 
+.dashboardPieChart {
+  width: 100%;
+  height: 300px;
+}
+
+/* Loading */
+.dashboardLoading {
+  font-size: 1.2rem;
+  text-align: center;
+  margin-top: 50px;
+}

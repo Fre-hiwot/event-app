@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import style from "../../../styles/dashboard/admin/users.module.css";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // FILTER STATE
+  const [roleFilter, setRoleFilter] = useState("all");
 
   // CREATE USER STATE
   const [creatingUser, setCreatingUser] = useState(false);
@@ -40,6 +44,12 @@ export default function AdminUsers() {
     }
   };
 
+  // ================= FILTERED USERS =================
+  const filteredUsers = users.filter((u) => {
+    if (roleFilter === "all") return true;
+    return u.role_id === parseInt(roleFilter);
+  });
+
   // ================= STATS =================
   const totalUsers = users.filter((u) => u.role_id === 7).length;
   const totalOrganizers = users.filter((u) => u.role_id === 6).length;
@@ -53,7 +63,7 @@ export default function AdminUsers() {
     try {
       const res = await fetch("/api/admin/create-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           name: newName,
           email: newEmail,
@@ -66,11 +76,13 @@ export default function AdminUsers() {
       if (!res.ok) return alert(data.error || "Failed to create user");
 
       setUsers((prev) => [...prev, data.user]);
+
       setNewName("");
       setNewEmail("");
       setNewPassword("");
       setNewRole(7);
       setCreatingUser(false);
+
       alert("User created successfully!");
     } catch (err) {
       console.error(err);
@@ -95,7 +107,7 @@ export default function AdminUsers() {
     try {
       const res = await fetch("/api/admin/update-user", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           id: editingUser.id,
           name: editName,
@@ -114,6 +126,7 @@ export default function AdminUsers() {
             : u
         )
       );
+
       cancelEditing();
       alert("User updated successfully!");
     } catch (err) {
@@ -129,7 +142,7 @@ export default function AdminUsers() {
     try {
       const res = await fetch("/api/admin/delete-user", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ id }),
       });
 
@@ -144,165 +157,120 @@ export default function AdminUsers() {
     }
   };
 
-  if (loading) return <p>Loading users...</p>;
+  if (loading) return <p className={style.loading}>Loading users...</p>;
 
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-3xl font-bold">Manage Users</h1>
+    <div className={style.container}>
+      <h1 className={style.title}>Manage Users</h1>
 
       {/* ===== STATS ===== */}
-      <div className="flex gap-4 flex-wrap">
-        <div className="bg-white shadow p-4 rounded w-40 text-center">
-          <p className="text-sm text-gray-500">Users</p>
-          <p className="text-xl font-bold">{totalUsers}</p>
+      <div className={style.stats}>
+        <div className={style.statCard}>
+          <p>Users</p>
+          <h2>{totalUsers}</h2>
         </div>
 
-        <div className="bg-white shadow p-4 rounded w-40 text-center">
-          <p className="text-sm text-gray-500">Organizers</p>
-          <p className="text-xl font-bold">{totalOrganizers}</p>
+        <div className={style.statCard}>
+          <p>Organizers</p>
+          <h2>{totalOrganizers}</h2>
         </div>
 
-        <div className="bg-white shadow p-4 rounded w-40 text-center">
-          <p className="text-sm text-gray-500">Admins</p>
-          <p className="text-xl font-bold">{totalAdmins}</p>
+        <div className={style.statCard}>
+          <p>Admins</p>
+          <h2>{totalAdmins}</h2>
         </div>
+      </div>
+
+      {/* ===== FILTER ===== */}
+      <div className={style.filterContainer}>
+        <label>Filter by Role:</label>
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className={style.select}
+        >
+          <option value="all">All</option>
+          <option value="5">Admin</option>
+          <option value="6">Organizer</option>
+          <option value="7">User</option>
+        </select>
       </div>
 
       {/* ===== CREATE USER ===== */}
       {!creatingUser ? (
         <button
-          className="px-4 py-2 bg-green-600 text-white rounded"
+          className={style.createBtn}
           onClick={() => setCreatingUser(true)}
         >
           + Create New User
         </button>
       ) : (
-        <div className="bg-gray-100 p-4 rounded space-y-2 max-w-md">
-          <input
-            placeholder="Name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="border p-2 w-full rounded"
-          />
-          <input
-            placeholder="Email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            className="border p-2 w-full rounded"
-          />
-          <input
-            placeholder="Password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="border p-2 w-full rounded"
-          />
-          <select
-            value={newRole}
-            onChange={(e) => setNewRole(parseInt(e.target.value))}
-            className="border p-2 w-full rounded"
-          >
+        <div className={style.form}>
+          <input placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+          <input type="password" placeholder="Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+
+          <select value={newRole} onChange={(e) => setNewRole(parseInt(e.target.value))}>
             <option value={5}>Admin</option>
             <option value={6}>Organizer</option>
             <option value={7}>User</option>
           </select>
 
-          <div className="flex gap-2 mt-2">
-            <button
-              className="px-3 py-1 bg-green-500 text-white rounded"
-              onClick={handleCreateUser}
-            >
-              Create
-            </button>
-            <button
-              className="px-3 py-1 bg-gray-500 text-white rounded"
-              onClick={() => setCreatingUser(false)}
-            >
-              Cancel
-            </button>
+          <div className={style.formButtons}>
+            <button onClick={handleCreateUser}>Create</button>
+            <button onClick={() => setCreatingUser(false)}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* ===== USERS TABLE ===== */}
-      <table className="min-w-full bg-white border border-gray-200 shadow rounded">
-        <thead className="bg-gray-100">
+      {/* ===== TABLE ===== */}
+      <table className={style.table}>
+        <thead>
           <tr>
-            <th className="px-4 py-2 border">Name</th>
-            <th className="px-4 py-2 border">Email</th>
-            <th className="px-4 py-2 border">Role</th>
-            <th className="px-4 py-2 border">Actions</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
           </tr>
         </thead>
+
         <tbody>
-          {users.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <tr>
-              <td colSpan="4" className="text-center py-4">
+              <td colSpan="4" className={style.noData}>
                 No users found
               </td>
             </tr>
           ) : (
-            users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2 border">
+            filteredUsers.map((u) => (
+              <tr key={u.id}>
+                <td>
                   {editingUser?.id === u.id ? (
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="border px-2 py-1 w-full rounded"
-                    />
-                  ) : (
-                    u.name
-                  )}
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  ) : u.name}
                 </td>
-                <td className="px-4 py-2 border">
+
+                <td>
                   {editingUser?.id === u.id ? (
-                    <input
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      className="border px-2 py-1 w-full rounded"
-                    />
-                  ) : (
-                    u.email
-                  )}
+                    <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                  ) : u.email}
                 </td>
-                <td className="px-4 py-2 border">
-                  {u.role_id === 5
-                    ? "Admin"
-                    : u.role_id === 6
-                    ? "Organizer"
-                    : "User"}
+
+                <td>
+                  {u.role_id === 5 ? "Admin" :
+                   u.role_id === 6 ? "Organizer" : "User"}
                 </td>
-                <td className="px-4 py-2 border flex gap-2">
+
+                <td className={style.actions}>
                   {editingUser?.id === u.id ? (
                     <>
-                      <button
-                        className="px-3 py-1 bg-green-500 text-white rounded"
-                        onClick={saveEditing}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="px-3 py-1 bg-gray-500 text-white rounded"
-                        onClick={cancelEditing}
-                      >
-                        Cancel
-                      </button>
+                      <button onClick={saveEditing}>Save</button>
+                      <button onClick={cancelEditing}>Cancel</button>
                     </>
                   ) : (
                     <>
-                      <button
-                        className="px-3 py-1 bg-blue-500 text-white rounded"
-                        onClick={() => startEditing(u)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="px-3 py-1 bg-red-500 text-white rounded"
-                        onClick={() => handleDelete(u.id)}
-                      >
-                        Delete
-                      </button>
+                      <button onClick={() => startEditing(u)}>Edit</button>
+                      <button onClick={() => handleDelete(u.id)}>Delete</button>
                     </>
                   )}
                 </td>

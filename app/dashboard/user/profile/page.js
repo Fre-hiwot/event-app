@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabase";
+import style from "../../../styles/dashboard/user/profile.module.css";
 
 export default function UserProfile() {
-
   const [userId, setUserId] = useState(null);
 
   const [profile, setProfile] = useState({
@@ -23,9 +23,7 @@ export default function UserProfile() {
   }, []);
 
   async function loadUser() {
-
     const { data: { user } } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data } = await supabase
@@ -36,7 +34,6 @@ export default function UserProfile() {
 
     if (data) {
       setUserId(data.id);
-
       setProfile({
         name: data.name || "",
         email: data.email || "",
@@ -51,7 +48,6 @@ export default function UserProfile() {
   }
 
   async function updateProfile() {
-
     const { error } = await supabase
       .from("users")
       .update(profile)
@@ -66,54 +62,41 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="p-6 max-w-lg">
-
-      <h1 className="text-2xl font-bold mb-6">
-        My Profile
-      </h1>
+    <div className={style.profileContainer}>
+      <h1 className={style.profileHeading}>My Profile</h1>
 
       {/* Name */}
-      <label className="font-semibold">Name</label>
+      <label className={style.profileLabel}>Name</label>
       <input
         type="text"
         value={profile.name}
-        onChange={(e) =>
-          setProfile({ ...profile, name: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+        className={style.profileInput}
       />
 
       {/* Email */}
-      <label className="font-semibold">Email</label>
+      <label className={style.profileLabel}>Email</label>
       <input
         type="email"
         value={profile.email}
         disabled
-        className="w-full border p-2 rounded mb-4 bg-gray-100"
+        className={`${style.profileInput} ${style.profileInputDisabled}`}
       />
 
       {/* Phone */}
-      <label className="font-semibold">Phone</label>
+      <label className={style.profileLabel}>Phone</label>
       <input
         type="text"
         value={profile.phone}
-        onChange={(e) =>
-          setProfile({ ...profile, phone: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+        className={style.profileInput}
       />
 
-      <h2 className="text-xl font-bold mt-6 mb-4">
-        Payment Method
-      </h2>
-
-      {/* Payment Method */}
+      <h2 className={style.profileSubheading}>Payment Method</h2>
       <select
         value={profile.payment_method}
-        onChange={(e) =>
-          setProfile({ ...profile, payment_method: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, payment_method: e.target.value })}
+        className={style.profileSelect}
       >
         <option value="">Select Payment Method</option>
         <option value="card">Credit/Debit Card</option>
@@ -121,57 +104,39 @@ export default function UserProfile() {
         <option value="bank">Bank Transfer</option>
       </select>
 
-      {/* Card Name */}
+      {/* Card Details */}
       <input
         type="text"
         placeholder="Card Holder Name"
         value={profile.card_name}
-        onChange={(e) =>
-          setProfile({ ...profile, card_name: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, card_name: e.target.value })}
+        className={style.profileInput}
       />
-
-      {/* Card Number */}
       <input
         type="text"
         placeholder="Card Number"
         value={profile.card_number}
-        onChange={(e) =>
-          setProfile({ ...profile, card_number: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, card_number: e.target.value })}
+        className={style.profileInput}
       />
-
-      {/* Expiry */}
       <input
         type="text"
         placeholder="Expiry Date (MM/YY)"
         value={profile.card_expiry}
-        onChange={(e) =>
-          setProfile({ ...profile, card_expiry: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-4"
+        onChange={(e) => setProfile({ ...profile, card_expiry: e.target.value })}
+        className={style.profileInput}
       />
-
-      {/* CVV */}
       <input
         type="password"
         placeholder="CVV"
         value={profile.card_cvv}
-        onChange={(e) =>
-          setProfile({ ...profile, card_cvv: e.target.value })
-        }
-        className="w-full border p-2 rounded mb-6"
+        onChange={(e) => setProfile({ ...profile, card_cvv: e.target.value })}
+        className={style.profileInput}
       />
 
-      <button
-        onClick={updateProfile}
-        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-      >
+      <button onClick={updateProfile} className={style.profileButton}>
         Update Profile
       </button>
-
     </div>
   );
 }

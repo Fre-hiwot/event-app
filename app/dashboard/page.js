@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import styles from "../../styles/dashboard/roleDashboard.module.css";
+import styles from "../../STYLE/dashboard/roleDashboard.module.css";
 
 export default function FeaturedEventsPage() {
   const ADMIN = 5;
   const ORGANIZER = 6;
+  const router = useRouter();
 
   const [role, setRole] = useState(null);
   const [userId, setUserId] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // -------------------
-  // Initialization
-  // -------------------
   useEffect(() => {
     initialize();
   }, []);
@@ -25,101 +24,68 @@ export default function FeaturedEventsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      if (token) {
-        // Get user role
-        const res = await fetch("/api/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const { user } = await res.json();
-        if (user) {
-          setRole(user.role_id);
-          setUserId(user.id);
-        }
-      }
+      if (!token) throw new Error("Not logged in");
 
-      // Fetch featured events
-      fetchFeaturedEvents();
+      const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const { user } = await res.json();
+
+      if (!user) throw new Error("User data not found");
+
+      setRole(user.role_id);
+      setUserId(user.id);
+
+      await fetchFeaturedEvents(user.id, user.role_id);
     } catch (err) {
       console.error("Initialization error:", err);
       setEvents([]);
+      setLoading(false);
     }
   }
 
-  async function fetchFeaturedEvents() {
+  async function fetchFeaturedEvents(userId, role) {
     setLoading(true);
     try {
-      const res = await fetch("/api/events/get/featured", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch featured events");
+      let query = supabase
+        .from("events")
+        .select("*")
+        .eq("is_featured", true)
+        .order("date", { ascending: true });
 
-      const json = await res.json();
-      setEvents(json.events || []);
+      // Only organizers see their own featured events
+      if (role === ORGANIZER) {
+        query = query.eq("created_by", userId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching featured events:", error);
+        setEvents([]);
+      } else {
+        setEvents(data || []);
+      }
     } catch (err) {
-      console.error("Error fetching featured events:", err);
+      console.error("Unexpected error in fetchFeaturedEvents:", err);
       setEvents([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // -------------------
-  // Event actions
-  // -------------------
-  async function handleBook(eventId) {
-    const ticketsInput = prompt("How many tickets do you need?", "1");
-    if (!ticketsInput) return;
-
-    const tickets = parseInt(ticketsInput, 10);
-    if (isNaN(tickets) || tickets <= 0) return alert("Enter a valid number of tickets");
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return alert("Not authenticated");
-
-      const res = await fetch("/api/bookings/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ event_id: eventId, tickets }),
-      });
-
-      const result = await res.json();
-      if (res.ok) alert(result.message);
-      else alert(result.error);
-    } catch (err) {
-      console.error(err);
-      alert("Booking failed");
-    }
+  function handleBook(eventId) {
+    router.push(`/bookings/bookevent?event_id=${eventId}`);
   }
 
-  async function handleDelete(eventId) {
-    if (!confirm("Delete this event?")) return;
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "ETB",
+    }).format(Number(value));
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const res = await fetch("/api/events/delete", {
-        method: "DELETE",
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ event_id: eventId }),
-      });
-
-      const result = await res.json();
-      if (res.ok) fetchFeaturedEvents();
-      else alert(result.error || "Delete failed");
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed");
-    }
-  }
-
-  if (loading) return <div className={styles.page}>Loading featured events...</div>;
+  if (loading)
+    return <div className={styles.page}>Loading featured events...</div>;
 
   return (
     <div className={styles.page}>
@@ -127,44 +93,62 @@ export default function FeaturedEventsPage() {
 
       {events.length === 0 ? (
         <div className={styles.emptyStateCard}>
-          <p>No events are featured yet.</p>
+          <p>
+            No featured events {role === ORGANIZER ? "created by you" : ""}.
+          </p>
         </div>
       ) : (
         <div className={styles.eventList}>
-          {events.map(ev => (
-            <div key={ev.id} className={styles.eventCard}>
-              <h3 className="font-bold text-lg">{ev.title}</h3>
-              <p>Date: {new Date(ev.date).toLocaleDateString()}</p>
-              <p>Location: {ev.location}</p>
-              <p>
-                Price: {ev.price && Number(ev.price) > 0
-                  ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(ev.price))
-                  : "Free"}
-              </p>
+          {events.map((ev) => {
+            const prices = [
+              { label: "Regular", value: Number(ev.price_regular) },
+              { label: "VIP", value: Number(ev.price_vip) },
+              { label: "VVIP", value: Number(ev.price_vvip) },
+            ].filter((p) => p.value > 0);
 
-              <div className="mt-2 flex gap-2">
-                {/* Edit/Delete for admins/organizers */}
-                {(role === ADMIN || role === ORGANIZER) && (
-                  <>
-                    <button
-                      onClick={() => handleDelete(ev.id)}
-                      className="bg-red-600 text-white px-2 py-1 rounded"
-                    >
-                      Delete
-                    </button>
-                  </>
+            const allFree = prices.length === 0;
+
+            return (
+              <div key={ev.id} className={styles.eventCard}>
+                <img
+                  src={ev.image_url || "/default-event.jpg"}
+                  alt={ev.title}
+                  className={styles.eventImage}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/default-event.jpg";
+                  }}
+                />
+                <h3 className={styles.eventTitle}>{ev.title}</h3>
+                <p>Date: {new Date(ev.date).toLocaleDateString()}</p>
+                <p>Location: {ev.location}</p>
+
+                {allFree ? (
+                  <p>Price: Free</p>
+                ) : prices.length === 1 ? (
+                  <p>Price: {formatCurrency(prices[0].value)}</p>
+                ) : (
+                  <div>
+                    <p><strong>Ticket Options:</strong></p>
+                    {prices.map((p) => (
+                      <p key={p.label}>
+                        {p.label}: {formatCurrency(p.value)}
+                      </p>
+                    ))}
+                  </div>
                 )}
 
-                {/* Book button */}
-                <button
-                  onClick={() => handleBook(ev.id)}
-                  className="px-2 py-1 rounded text-white bg-blue-600"
-                >
-                  Book
-                </button>
+                <div className={styles.buttonGroup}>
+                  <button
+                    onClick={() => handleBook(ev.id)}
+                    className={styles.bookButton}
+                  >
+                    Book
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

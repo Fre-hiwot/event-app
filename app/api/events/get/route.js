@@ -8,10 +8,24 @@ export async function GET(req) {
 
     console.log("Received category_id:", category_id);
 
-    // ✅ Include price in the selected fields
+    // Select all fields including separate ticket prices
     let query = supabase
       .from("events")
-      .select("id, title, description, date, location, category_id, price") // added price
+      .select(`
+        id,
+        title,
+        description,
+        date,
+        location,
+        category_id,
+        price_regular,
+        price_vip,
+        price_vvip,
+        image_url,
+        is_featured,
+        created_at,
+        created_by
+      `)
       .order("date", { ascending: true });
 
     if (category_id) {

@@ -17,7 +17,7 @@ export default function Home() {
         <div className={styles.highlightGrid}>
 
           <div className={styles.card}>
-            <img src="/images/image1.jpg" alt="Music Festival" className={styles.cardImage}/>
+            <img src="/images/image5.jpg" alt="Music Festival" className={styles.cardImage}/>
             <h3>Music Festival</h3>
           </div>
 
@@ -47,22 +47,22 @@ export default function Home() {
         </div>
 
          <div className={styles.card}>
-            <img src="/images/image6.jpg" alt="Art Exhibition" className={styles.cardImage}/>
+            <img src="/images/image7.jpg" alt="Art Exhibition" className={styles.cardImage}/>
             <h3>Photography Showcase</h3>
         </div>
 
          <div className={styles.card}>
-            <img src="/images/image6.jpg" alt="Art Exhibition" className={styles.cardImage}/>
+            <img src="/images/image8.jpg" alt="Art Exhibition" className={styles.cardImage}/>
             <h3>Coffee Lovers Meetup</h3>
         </div>
 
          <div className={styles.card}>
-            <img src="/images/image6.jpg" alt="Art Exhibition" className={styles.cardImage}/>
+            <img src="/images/image9.jpg" alt="Art Exhibition" className={styles.cardImage}/>
             <h3>Startup Meetup</h3>
         </div>
 
          <div className={styles.card}>
-            <img src="/images/image6.jpg" alt="Art Exhibition" className={styles.cardImage}/>
+            <img src="/images/image10.jpg" alt="Art Exhibition" className={styles.cardImage}/>
             <h3>Community Clean-Up</h3>
         </div>
 

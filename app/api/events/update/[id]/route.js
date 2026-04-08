@@ -7,17 +7,12 @@ export async function PUT(req) {
     const url = new URL(req.url);
     const id = url.pathname.split("/").pop();
 
-
-    // 1️⃣ Get Bearer token from headers
-
+    // 1️⃣ Auth
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const token = authHeader.split(" ")[1];
-
-
-    // 2️⃣ Get auth user from token
 
     const {
       data: { user },
@@ -28,41 +23,53 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-  
-    // 3️⃣ Fetch user profile from DB
-  
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // 2️⃣ Get profile
+    const { data: profile } = await supabaseAdmin
       .from("users")
       .select("id, role_id")
       .eq("auth_id", user.id)
       .single();
 
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-
-    // 4️⃣ Parse request body
- 
+    // 3️⃣ Body
     const {
       title,
       description,
       location,
-      price,
+      price_regular_stages,
+      end_date_stages, // ✅ NEW
+      price_vip,
+      price_vvip,
       date,
       category_id,
       image_url,
+      ticket_limit,
     } = await req.json();
 
     if (!id || !title || !date || !category_id) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // 4️⃣ Validate stage order
+    const early = end_date_stages?.early;
+    const round2 = end_date_stages?.round2;
+    const round3 = end_date_stages?.round3;
+
+    if (
+      (early && round2 && new Date(early) >= new Date(round2)) ||
+      (round2 && round3 && new Date(round2) >= new Date(round3)) ||
+      (round3 && date && new Date(round3) >= new Date(date))
+    ) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Invalid stage dates: must be Early < Round2 < Round3 < Event Date" },
         { status: 400 }
       );
     }
 
-    // 6️⃣ Duplicate check
-
+    // 5️⃣ Duplicate check
     const { data: existing } = await supabaseAdmin
       .from("events")
       .select("id")
@@ -77,18 +84,41 @@ export async function PUT(req) {
         { status: 400 }
       );
     }
-    // 7️⃣ Build update query
-  
+
+    // 6️⃣ Clean pricing
+    const regularPricing = {
+      early: price_regular_stages?.early
+        ? parseFloat(price_regular_stages.early)
+        : 0,
+      round2: price_regular_stages?.round2
+        ? parseFloat(price_regular_stages.round2)
+        : 0,
+      round3: price_regular_stages?.round3
+        ? parseFloat(price_regular_stages.round3)
+        : 0,
+    };
+
+    const endDates = {
+      early: end_date_stages?.early || null,
+      round2: end_date_stages?.round2 || null,
+      round3: end_date_stages?.round3 || null,
+    };
+
+    // 7️⃣ Update
     let query = supabaseAdmin
       .from("events")
       .update({
         title,
         description,
         location,
-        price: price ? parseFloat(price) : 0,
         date,
         category_id: parseInt(category_id),
-        image_url,
+        image_url: image_url || null,
+        ticket_limit: ticket_limit ? parseInt(ticket_limit) : 0,
+        price_regular_stages: regularPricing,
+        end_date_stages: endDates, // ✅ NEW
+        price_vip: price_vip ? parseFloat(price_vip) : 0,
+        price_vvip: price_vvip ? parseFloat(price_vvip) : 0,
       })
       .eq("id", id);
 
@@ -111,21 +141,26 @@ export async function PUT(req) {
     }
 
     // 8️⃣ Audit log
-   
     await auditLogger({
       user_id: profile.id,
       action_type: "Update",
       object_type: "event",
       object_id: id,
       object_name: title,
-      details: "Event updated successfully",
+      details: {
+        price_regular_stages: regularPricing,
+        end_date_stages: endDates,
+      },
     });
 
     return NextResponse.json({
       message: "Event updated successfully",
       event: data[0],
     });
+
   } catch (err) {
+    console.error(err);
+
     await auditLogger({
       user_id: null,
       action_type: "Server Error",

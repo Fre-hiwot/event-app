@@ -7,15 +7,26 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const category_id = searchParams.get("category_id");
 
-    // Build query
+    // Build query with separate ticket prices
     let query = supabase
       .from("events")
-      .select("id, title, description, date, location, category_id") // Make sure category_id is included
+      .select(`
+        id,
+        title,
+        description,
+        date,
+        location,
+        category_id,
+        price_regular,
+        price_vip,
+        price_vvip,
+        image_url
+      `)
       .order("date", { ascending: true });
 
     // Filter by category_id if provided
     if (category_id) {
-      query = query.eq("category_id", Number(category_id)); // Convert to number
+      query = query.eq("category_id", Number(category_id));
     }
 
     const { data, error } = await query;

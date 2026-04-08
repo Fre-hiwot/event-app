@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabase";
+import style from "../../../styles/dashboard/organizer/profile.module.css";
 
 export default function OrganizerProfile() {
   const [name, setName] = useState("");
@@ -10,7 +11,6 @@ export default function OrganizerProfile() {
   const [userAuthId, setUserAuthId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Password states
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -47,20 +47,37 @@ export default function OrganizerProfile() {
   };
 
   const updateProfile = async () => {
-    const { error } = await supabase
-      .from("users")
-      .update({ name, phone })
-      .eq("auth_id", userAuthId);
+    if (!userAuthId) return alert("User not logged in");
 
-    if (error) {
-      console.log(error);
-      alert("Profile update failed");
-    } else {
-      alert("Profile updated successfully");
+    try {
+      // 1️⃣ Update Supabase Auth (email)
+      const { data: authData, error: authError } = await supabase.auth.updateUser({
+        email,
+      });
+
+      if (authError) {
+        console.log("Auth update error:", authError);
+        return alert("Failed to update email: " + authError.message);
+      }
+
+      // 2️⃣ Update users table (name, phone, email)
+      const { error: tableError } = await supabase
+        .from("users")
+        .update({ name, phone, email })
+        .eq("auth_id", userAuthId);
+
+      if (tableError) {
+        console.log("Table update error:", tableError);
+        return alert("Failed to update profile info");
+      }
+
+      alert("Profile updated successfully!");
+    } catch (err) {
+      console.error("Profile update error:", err);
+      alert("Unexpected error while updating profile");
     }
   };
 
-  // ✅ FIXED PASSWORD FUNCTION
   const changePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword)
       return alert("Fill all password fields");
@@ -69,25 +86,18 @@ export default function OrganizerProfile() {
       return alert("Passwords do not match");
 
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-
       if (!user) return alert("User not logged in");
 
-      // Verify old password (without breaking session permanently)
       const { error: verifyError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: oldPassword,
       });
 
-      if (verifyError) {
-        return alert("Old password is incorrect");
-      }
+      if (verifyError) return alert("Old password is incorrect");
 
-      // Refresh session (important)
       await supabase.auth.refreshSession();
 
-      // Update password
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -97,7 +107,6 @@ export default function OrganizerProfile() {
         return alert("Failed to update password: " + updateError.message);
       }
 
-      // Clear inputs
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -110,63 +119,63 @@ export default function OrganizerProfile() {
   };
 
   if (loading) {
-    return <p className="p-6">Loading profile...</p>;
+    return <p className={style["organizer-profile-loading"]}>Loading profile...</p>;
   }
 
   return (
-    <div className="p-6 max-w-lg">
-      <h1 className="text-2xl font-bold mb-6">Organizer Profile</h1>
+    <div className={style["organizer-profile-container"]}>
+      <h1 className={style["organizer-profile-title"]}>Organizer Profile</h1>
 
-      <div className="space-y-4">
+      <div className={style["organizer-profile-form"]}>
 
         {/* Profile Info */}
-        <div>
-          <label>Name</label>
+        <div className={style["profile-section"]}>
+          <label className={style["profile-label"]}>Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border p-2 w-full rounded"
+            className={style["profile-input"]}
           />
         </div>
 
-        <div>
-          <label>Email</label>
+        <div className={style["profile-section"]}>
+          <label className={style["profile-label"]}>Email</label>
           <input
             type="email"
             value={email}
-            disabled
-            className="border p-2 w-full rounded bg-gray-100"
+            onChange={(e) => setEmail(e.target.value)} // Now editable
+            className={style["profile-input"]}
           />
         </div>
 
-        <div>
-          <label>Phone</label>
+        <div className={style["profile-section"]}>
+          <label className={style["profile-label"]}>Phone</label>
           <input
             type="text"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="border p-2 w-full rounded"
+            className={style["profile-input"]}
           />
         </div>
 
         <button
           onClick={updateProfile}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className={`${style["profile-button"]} ${style["profile-button-update"]}`}
         >
           Update Profile
         </button>
 
         {/* Password Section */}
-        <div className="mt-6 border-t pt-4 space-y-2">
-          <h2 className="text-xl font-semibold">Change Password</h2>
+        <div className={style["password-section"]}>
+          <h2 className={style["password-title"]}>Change Password</h2>
 
           <input
             type="password"
             placeholder="Old Password"
             value={oldPassword}
             onChange={(e) => setOldPassword(e.target.value)}
-            className="border p-2 w-full rounded"
+            className={style["password-input"]}
           />
 
           <input
@@ -174,7 +183,7 @@ export default function OrganizerProfile() {
             placeholder="New Password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="border p-2 w-full rounded"
+            className={style["password-input"]}
           />
 
           <input
@@ -182,12 +191,12 @@ export default function OrganizerProfile() {
             placeholder="Confirm New Password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="border p-2 w-full rounded"
+            className={style["password-input"]}
           />
 
           <button
             onClick={changePassword}
-            className="bg-green-600 text-white px-4 py-2 rounded"
+            className={`${style["profile-button"]} ${style["profile-button-password"]}`}
           >
             Update Password
           </button>

@@ -1,0 +1,40 @@
+.container {
+  max-width: 1000px;   /* wider but still readable */
+  width: 90%;           /* responsive for smaller screens */
+  margin: 40px auto;    /* centers horizontally */
+  padding: 30px;        /* nice padding inside */
+  box-sizing: border-box; /* include padding in width */
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ✅ FIX: scoped inputs */
+.form input,
+.form textarea,
+.form select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+/* ✅ FIX: scoped button */
+.form button {
+  padding: 12px;
+  background: #facc15;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.form button:hover {
+  background: #eab308;
+}
+
+.form h3 {
+  margin-top: 15px;
+  font-size: 16px;
+  color: #444;
+}

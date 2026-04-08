@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
+import styles from "../../../styles/event/eventpage.module.css";
 
 export default function EventsPage() {
   const router = useRouter();
@@ -17,9 +18,12 @@ export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [bookedEventIds, setBookedEventIds] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
-
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [expandedDesc, setExpandedDesc] = useState({});
 
+  // ------------------
+  // Initialization
+  // ------------------
   useEffect(() => {
     initialize();
   }, []);
@@ -27,8 +31,9 @@ export default function EventsPage() {
   useEffect(() => {
     const catId = searchParams.get("category_id");
     if (catId) {
-      setSelectedCategory(parseInt(catId));
-      fetchEvents(parseInt(catId));
+      const id = parseInt(catId);
+      setSelectedCategory(id);
+      fetchEvents(id);
     }
   }, [searchParams, role]);
 
@@ -104,40 +109,30 @@ export default function EventsPage() {
     }
   }
 
-  async function handleBook(eventId) {
-    const quantityStr = prompt("Tickets?", "1");
-    if (!quantityStr) return;
-    const tickets = parseInt(quantityStr);
-    if (isNaN(tickets) || tickets <= 0) return alert("Invalid");
+  // ------------------
+  // Redirect to booking page
+  // ------------------
+  function handleBook(event) {
+    router.push(
+      `/bookings/bookevent?event_id=${event.id}` +
+      `&price_regular=${event.price_regular || 0}` +
+      `&price_vip=${event.price_vip || 0}` +
+      `&price_vvip=${event.price_vvip || 0}` +
+      `&category_id=${selectedCategory}`
+    );
+  }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-
-    const userRes = await fetch("/api/users/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const { user } = await userRes.json();
-
-    const res = await fetch("/api/bookings/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ user_id: user.id, event_id: eventId, tickets }),
-    });
-    const result = await res.json();
-    if (res.ok) setBookedEventIds(prev => [...prev, eventId]);
-    else alert(result.error);
+  function toggleDescription(id) {
+    setExpandedDesc(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
   // ------------------
-  // UI
+  // Render
   // ------------------
   return (
-    <div className="p-6">
-      <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">
+    <div className={styles["events-container"]}>
+      <div className={styles["events-header"]}>
+        <h1 className={styles["events-title"]}>
           {selectedCategory
             ? `Events in ${categories.find(c => c.id === selectedCategory)?.name || ""}`
             : "All Events"}
@@ -146,38 +141,83 @@ export default function EventsPage() {
         {(role === ADMIN || role === ORGANIZER) && (
           <button
             onClick={handleCreateEvent}
-            className="bg-green-600 text-white px-4 py-2 rounded"
+            className={styles["events-create-button"]}
           >
             Create Event
           </button>
         )}
       </div>
 
-      
-
       {loadingEvents ? (
-        <p>Loading events...</p>
+        <p className={styles["events-loading"]}>Loading events...</p>
       ) : events.length === 0 ? (
-        <p>No events found</p>
+        <p className={styles["events-empty"]}>No events found</p>
       ) : (
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className={styles["events-grid"]}>
           {events.map(event => {
             const hasBooking = bookedEventIds.includes(event.id);
+            const isExpanded = expandedDesc[event.id];
             return (
-              <div key={event.id} className="bg-white p-4 rounded shadow">
-                <h2 className="font-bold">{event.title}</h2>
-                <p>{event.location}</p>
-                <p>{new Date(event.date).toLocaleDateString()}</p>
-                <p>${event.price}</p>
+              <div key={event.id} className={styles["event-card"]}>
+                
+                <img
+                  src={event.image_url || "/default-event.jpg"}
+                  alt={event.title}
+                  className={styles["event-image"]}
+                  onError={e => e.target.src = "/default-event.jpg"}
+                />
 
-                <div className="mt-2 flex gap-2">
+                <h2 className={styles["event-name"]}>{event.title}</h2>
+                <p className={styles["event-location"]}>{event.location}</p>
+                <p className={styles["event-date"]}>{new Date(event.date).toLocaleDateString()}</p>
+
+                {/* Tiered Prices */}
+                <p className={styles["event-price"]}>
+                  {event.price_regular !== undefined && <><strong>Regular:</strong> ${event.price_regular.toFixed(2)}<br/></>}
+                  {event.price_vip !== undefined && <><strong>VIP:</strong> ${event.price_vip.toFixed(2)}<br/></>}
+                  {event.price_vvip !== undefined && <><strong>VVIP:</strong> ${event.price_vvip.toFixed(2)}</>}
+                </p>
+
+                <div className={styles["event-description-wrapper"]}>
+                  {event.description && (
+                    <p
+                      className={`${styles["event-description"]} ${isExpanded ? styles.expanded : ""}`}
+                    >
+                      {event.description}
+                    </p>
+                  )}
+                  {event.description?.length > 100 && (
+                    <button
+                      onClick={() => toggleDescription(event.id)}
+                      className={styles["show-more-text"]}
+                    >
+                      {isExpanded ? "Read less" : "Read more"}
+                    </button>
+                  )}
+                </div>
+
+                <div className={styles["event-actions"]}>
                   {(role === ADMIN || role === ORGANIZER) ? (
                     <>
-                      <button onClick={() => handleEdit(event.id)} className="bg-yellow-500 px-2 py-1 rounded">Edit</button>
-                      <button onClick={() => handleDelete(event.id)} className="bg-red-600 text-white px-2 py-1 rounded">Delete</button>
+                      <button
+                        onClick={() => handleEdit(event.id)}
+                        className={styles["event-edit-button"]}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className={styles["event-delete-button"]}
+                      >
+                        Delete
+                      </button>
                     </>
                   ) : (
-                    <button onClick={() => handleBook(event.id)} className="bg-blue-600 text-white px-2 py-1 rounded">
+                    <button
+                      onClick={() => handleBook(event)}
+                      className={styles["event-book-button"]}
+                      disabled={hasBooking}
+                    >
                       {hasBooking ? "Booked" : "Book"}
                     </button>
                   )}

@@ -10,6 +10,18 @@
   align-items: center;
 }
 
+.backButton {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: white;
+}
+
+.backButton:hover {
+  text-decoration: underline;
+}
+
 .logo {
   font-size: 1.5rem;
   font-weight: bold;

@@ -1,0 +1,46 @@
+.container {
+    margin: 60px auto;   /* better spacing */
+    width: 350px;        /* consistent size */
+    padding: 20px;       /* inner spacing */
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;           /* cleaner spacing */
+}
+
+.title {
+    font-size: 15px;
+    font-weight: bold;
+    margin-top: 20px;
+
+}
+
+.Password {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-top: 10px;
+    font-size: 16px;
+    flex-direction: column;
+    width: 80%;
+    
+
+}
+
+.button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 20px;
+}
+
+.button:hover {
+    background-color: #0056b3;
+}

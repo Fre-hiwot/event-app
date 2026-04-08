@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import styles from "../styles/dashboard/roleDashboard.module.css";
+import styles from "../STYLE/dashboard/roleDashboard.module.css";
 import {
   Home,
   Users,
@@ -56,7 +56,7 @@ export default function RoleBasedDashboard({ children }) {
       <aside className={styles.sidebar}>
         <div
           className={styles.sidebarBanner}
-          style={{ backgroundImage: "url('/images/dashboard.jpg')" }}
+          style={{ backgroundImage: "url('https://tse1.mm.bing.net/th/id/OIP.ZUvBaaXLS3r9eX5NYaGNzAAAAA?w=189&h=189&rs=1&pid=ImgDetMain&o=7&rm=3')" }}
         ></div>
 
         <h2 className={styles.sidebarTitle}>Dashboard</h2>
@@ -150,7 +150,7 @@ export default function RoleBasedDashboard({ children }) {
                   </Link>
 
                   <Link
-                    href="/dashboard/admin/support"
+                    href="/dashboard/admin/support&feedback"
                     className={`${styles.navLink} ${
                       isActive("/dashboard/admin/support") ? styles.activeLink : ""
                     }`}

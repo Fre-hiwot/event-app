@@ -1,0 +1,71 @@
+/* bookevent.module.css */
+
+/* Container for the booking page */
+.bookeventcontainer {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #f9fafb;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: Arial, sans-serif;
+}
+
+/* Event title */
+.eventTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #111827;
+}
+
+/* Event description */
+.eventDescription {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #374151;
+}
+
+/* Event location and date */
+.eventLocation,
+.eventDate {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: #6b7280;
+}
+
+/* Ticket type select */
+.ticketTypeSelect {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background-color: #fff;
+  font-size: 1rem;
+}
+
+/* Book button */
+.bookButton {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background-color: #3b82f6;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.bookButton:hover {
+  background-color: #2563eb;
+}
+
+.bookButton:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}

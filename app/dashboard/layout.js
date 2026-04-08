@@ -1,6 +1,6 @@
 "use client";
 import RoleBasedDashboard from "../../components/RoleBasedDashboard";
-import styles from "../../styles/dashboard/roleDashboard.module.css";
+import styles from "../../STYLE/dashboard/roleDashboard.module.css";
 
 export default function DashboardLayout({ children }) {
   return (
@@ -8,7 +8,6 @@ export default function DashboardLayout({ children }) {
       <div className={styles.container}>
         {/* Dashboard content */}
         {children}
-
       
       </div>
     </RoleBasedDashboard>
