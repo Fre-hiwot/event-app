@@ -8,59 +8,43 @@ import styles from "../../../../styles/event/editevent.module.css";
 export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
-  const eventId = params.id;
+  const eventId = params?.id;
 
-  const ADMIN = 5;
-  const ORGANIZER = 6;
-
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState([]);
 
-  // Basic fields
+  // basic
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
 
-  // Pricing + stage dates
-  const [regularEarly, setRegularEarly] = useState("");
+  // prices
+  const [earlyPrice, setEarlyPrice] = useState("");
+  const [round2Price, setRound2Price] = useState("");
+  const [round3Price, setRound3Price] = useState("");
+
+  // end dates
   const [earlyEnd, setEarlyEnd] = useState("");
-
-  const [regularRound2, setRegularRound2] = useState("");
   const [round2End, setRound2End] = useState("");
-
-  const [regularRound3, setRegularRound3] = useState("");
   const [round3End, setRound3End] = useState("");
 
-  const [priceVIP, setPriceVIP] = useState("");
-  const [priceVVIP, setPriceVVIP] = useState("");
+  const [vip, setVip] = useState("");
+  const [vvip, setVvip] = useState("");
 
   const [date, setDate] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [ticketLimit, setTicketLimit] = useState("");
 
-  const [role, setRole] = useState(null);
-
-  // -------------------
-  // Fetch Data
-  // -------------------
   useEffect(() => {
-    async function fetchData() {
+    if (!eventId) return;
+
+    async function load() {
       setLoading(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-        return;
-      }
-
-      const userRes = await supabase
-        .from("users")
-        .select("role_id")
-        .eq("auth_id", session.user.id)
-        .single();
-
-      setRole(userRes.data?.role_id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return router.push("/login");
 
       const { data: event } = await supabase
         .from("events")
@@ -68,92 +52,80 @@ export default function EditEventPage() {
         .eq("id", eventId)
         .single();
 
-      if (!event) {
-        alert("Event not found");
-        router.push("/category/events");
-        return;
-      }
+      const stages = event.price_regular_stages || {};
+      const ends = event.end_date_stages || {};
 
-      // Fill data
       setTitle(event.title || "");
       setDescription(event.description || "");
       setLocation(event.location || "");
 
-      const stages = event.price_regular_stages || {};
+      setEarlyPrice(stages.early?.price || "");
+      setRound2Price(stages.round2?.price || "");
+      setRound3Price(stages.round3?.price || "");
 
-      setRegularEarly(stages.early?.price || "");
-      setEarlyEnd(stages.early?.end || "");
+      setEarlyEnd(ends.early || "");
+      setRound2End(ends.round2 || "");
+      setRound3End(ends.round3 || "");
 
-      setRegularRound2(stages.round2?.price || "");
-      setRound2End(stages.round2?.end || "");
+      setVip(event.price_vip || "");
+      setVvip(event.price_vvip || "");
 
-      setRegularRound3(stages.round3?.price || "");
-      setRound3End(stages.round3?.end || "");
-
-      setPriceVIP(event.price_vip || "");
-      setPriceVVIP(event.price_vvip || "");
       setDate(event.date?.split("T")[0] || "");
       setCategoryId(event.category_id || "");
       setImageUrl(event.image_url || "");
       setTicketLimit(event.ticket_limit || "");
 
-      const { data: catData } = await supabase.from("categories").select("*");
-      setCategories(catData || []);
+      const { data: cats } = await supabase.from("categories").select("*");
+      setCategories(cats || []);
 
       setLoading(false);
     }
 
-    fetchData();
+    load();
   }, [eventId]);
 
-  // -------------------
-  // Update
-  // -------------------
   async function handleUpdate(e) {
     e.preventDefault();
+    setSaving(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const { data: sessionData } = await supabase.auth.getSession();
 
     const res = await fetch(`/api/events/update/${eventId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${sessionData.session.access_token}`,
       },
       body: JSON.stringify({
         title,
         description,
         location,
+
         price_regular_stages: {
-          early: {
-            price: parseFloat(regularEarly) || 0,
-            end: earlyEnd || null,
-          },
-          round2: {
-            price: parseFloat(regularRound2) || 0,
-            end: round2End || null,
-          },
-          round3: {
-            price: parseFloat(regularRound3) || 0,
-            end: round3End || null,
-          },
+          early: { price: earlyPrice },
+          round2: { price: round2Price },
+          round3: { price: round3Price },
         },
-        price_vip: parseFloat(priceVIP) || 0,
-        price_vvip: parseFloat(priceVVIP) || 0,
+
+        end_date_stages: {
+          early: earlyEnd,
+          round2: round2End,
+          round3: round3End,
+        },
+
+        price_vip: vip,
+        price_vvip: vvip,
         date,
-        category_id: parseInt(categoryId),
-        image_url: imageUrl || null,
-        ticket_limit: parseInt(ticketLimit) || 0,
+        category_id: categoryId,
+        image_url: imageUrl,
+        ticket_limit: ticketLimit,
       }),
     });
 
     const data = await res.json();
+    setSaving(false);
 
-    if (!res.ok) {
-      alert(data.error);
-      return;
-    }
+    if (!res.ok) return alert(data.error);
 
     alert("Updated successfully");
     router.push(`/category/events?category_id=${categoryId}`);
@@ -167,50 +139,38 @@ export default function EditEventPage() {
 
       <form onSubmit={handleUpdate} className={styles.form}>
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
-
         <textarea value={description} onChange={e => setDescription(e.target.value)} />
-
         <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Location" />
 
-        {/* EARLY */}
-        <h3>Early Bird</h3>
-        <input type="number" value={regularEarly} onChange={e => setRegularEarly(e.target.value)} placeholder="Price" />
+        <h3>Early</h3>
+        <input type="number" value={earlyPrice} onChange={e => setEarlyPrice(e.target.value)} />
         <input type="date" value={earlyEnd} onChange={e => setEarlyEnd(e.target.value)} />
 
-        {/* ROUND 2 */}
         <h3>Round 2</h3>
-        <input type="number" value={regularRound2} onChange={e => setRegularRound2(e.target.value)} placeholder="Price"  />
+        <input type="number" value={round2Price} onChange={e => setRound2Price(e.target.value)} />
         <input type="date" value={round2End} onChange={e => setRound2End(e.target.value)} />
 
-        {/* ROUND 3 */}
         <h3>Round 3</h3>
-        <input type="number" value={regularRound3} onChange={e => setRegularRound3(e.target.value)} placeholder="Price" />
+        <input type="number" value={round3Price} onChange={e => setRound3Price(e.target.value)} />
         <input type="date" value={round3End} onChange={e => setRound3End(e.target.value)} />
 
-        {/* VIP & VVIP */}
-        <h3>VIP</h3>
-        <input type="number" value={priceVIP} onChange={e => setPriceVIP(e.target.value)} placeholder="VIP" />
+        <h3>VIP / VVIP</h3>
+        <input value={vip} onChange={e => setVip(e.target.value)} />
+        <input value={vvip} onChange={e => setVvip(e.target.value)} />
 
-        <h3>VVIP</h3>
-        <input type="number" value={priceVVIP} onChange={e => setPriceVVIP(e.target.value)} placeholder="VVIP" />
-
-        <h3>Event Date</h3>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} placeholder="Event Date" />
+        <h3>Date</h3>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} />
 
         <h3>Category</h3>
-        <select value={categoryId} onChange={e => setCategoryId(e.target.value)} placeholder="Select Category" >
-          {categories.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
+        <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+          {categories.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
 
-         <h3>Ticket Limit</h3>
-        <input type="number" value={ticketLimit} onChange={e => setTicketLimit(e.target.value)} placeholder="Limit" />
-        <h3>Image URL</h3>
-        <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="Image URL" />
-        
-
-        <button type="submit">Update</button>
+        <button disabled={saving}>
+          {saving ? "Updating..." : "Update"}
+        </button>
       </form>
     </div>
   );

@@ -18,9 +18,9 @@ export default function FeaturedManagementPage() {
     initialize();
   }, []);
 
-  // -------------------
-  // Initialization
-  // -------------------
+  // =========================
+  // INIT
+  // =========================
   async function initialize() {
     try {
       const {
@@ -28,14 +28,20 @@ export default function FeaturedManagementPage() {
       } = await supabase.auth.getSession();
 
       const token = session?.access_token;
-      if (!token) return alert("Not authenticated");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const resUser = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const { user } = await resUser.json();
-      if (!user) return alert("User not found");
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       setRole(user.role_id);
       setUserId(user.id);
@@ -47,27 +53,40 @@ export default function FeaturedManagementPage() {
     }
   }
 
-  // -------------------
-  // Fetch Events
-  // -------------------
+  // =========================
+  // ONLY DATE CHECK (IMPORTANT)
+  // =========================
+  const isEventActive = (date) => {
+    if (!date) return false;
+    return new Date(date).getTime() >= Date.now();
+  };
+
+  // =========================
+  // FETCH EVENTS (FILTERED)
+  // =========================
   async function fetchEvents(userRole, userId, token) {
     setLoading(true);
+
     try {
       const res = await fetch("/api/events/get", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch events");
+      const data = await res.json();
 
-      let { events } = await res.json();
-      if (!events) events = [];
+      let events = Array.isArray(data) ? data : data.events || [];
 
-      // Organizer sees only their events
+      // ORGANIZER ONLY THEIR EVENTS
       if (userRole === ORGANIZER) {
         events = events.filter((ev) => ev.created_by === userId);
       }
 
-      setEvents(events);
+      // ❌ REMOVE EXPIRED EVENTS (ONLY BY DATE)
+      const activeEvents = events.filter((ev) =>
+        isEventActive(ev.date)
+      );
+
+      setEvents(activeEvents);
     } catch (err) {
       console.error("Fetch events failed:", err);
       setEvents([]);
@@ -76,9 +95,9 @@ export default function FeaturedManagementPage() {
     }
   }
 
-  // -------------------
-  // Toggle Featured
-  // -------------------
+  // =========================
+  // TOGGLE FEATURED
+  // =========================
   async function toggleFeatured(eventId) {
     try {
       const {
@@ -89,7 +108,7 @@ export default function FeaturedManagementPage() {
       if (!token) return alert("Not authenticated");
 
       const event = events.find((ev) => ev.id === eventId);
-      if (!event) return alert("Event not found");
+      if (!event) return;
 
       const newFeatured = !event.is_featured;
       setUpdatingId(eventId);
@@ -107,19 +126,14 @@ export default function FeaturedManagementPage() {
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Update failed");
+      if (!res.ok) throw new Error(result.error);
 
-      // Update UI
       setEvents((prev) =>
         prev.map((ev) =>
-          ev.id === eventId ? { ...ev, is_featured: newFeatured } : ev
+          ev.id === eventId
+            ? { ...ev, is_featured: newFeatured }
+            : ev
         )
-      );
-
-      alert(
-        `Event "${event.title}" is now ${
-          newFeatured ? "featured" : "not featured"
-        }`
       );
     } catch (err) {
       console.error(err);
@@ -129,81 +143,89 @@ export default function FeaturedManagementPage() {
     }
   }
 
-  // -------------------
-  // Render
-  // -------------------
-  if (loading) return <p className={styles.page}>Loading events...</p>;
+  // =========================
+  // STAGES DISPLAY (UNCHANGED)
+  // =========================
+  function renderStages(ev) {
+    const stages = ev.price_regular_stages || {};
+    const ends = ev.end_date_stages || {};
 
-  if (role !== ADMIN && role !== ORGANIZER) {
     return (
-      <p className={styles.page}>
-        You do not have access to this page.
-      </p>
+      <div>
+        <p>
+          Early: ${stages.early?.price || 0} | End:{" "}
+          {ends.early ? new Date(ends.early).toLocaleDateString() : "N/A"}
+        </p>
+
+        <p>
+          Round2: ${stages.round2?.price || 0} | End:{" "}
+          {ends.round2 ? new Date(ends.round2).toLocaleDateString() : "N/A"}
+        </p>
+
+        <p>
+          Round3: ${stages.round3?.price || 0} | End:{" "}
+          {ends.round3 ? new Date(ends.round3).toLocaleDateString() : "N/A"}
+        </p>
+
+        <p>VIP: ${ev.price_vip || 0}</p>
+        <p>VVIP: ${ev.price_vvip || 0}</p>
+      </div>
     );
   }
 
+  // =========================
+  // LOADING / ACCESS
+  // =========================
+  if (loading) return <p className={styles.page}>Loading...</p>;
+
+  if (role !== ADMIN && role !== ORGANIZER) {
+    return <p className={styles.page}>No access</p>;
+  }
+
+  // =========================
+  // UI
+  // =========================
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Manage Featured Events</h1>
 
       {events.length === 0 ? (
-        <div className={styles.emptyStateCard}>
-          <p>No events found.</p>
-        </div>
+        <p>No events found</p>
       ) : (
         <div className={styles.eventList}>
           {events.map((ev) => (
             <div key={ev.id} className={styles.eventCard}>
               <img
                 src={ev.image_url || "/default-event.jpg"}
-                alt={ev.title}
                 className={styles.eventImage}
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/default-event.jpg";
-                }}
               />
 
-              <h3 className={styles.eventTitle}>{ev.title}</h3>
+              <h3>{ev.title}</h3>
 
-              <p>Date: {new Date(ev.date).toLocaleDateString()}</p>
-              <p>Location: {ev.location}</p>
-
-              {/* ✅ UPDATED PRICE SECTION */}
               <p>
-                Price:{" "}
-                {ev.price_regular
-                  ? `$${ev.price_regular}`
-                  : ev.price_vip || ev.price_vvip
-                  ? "See VIP options"
-                  : "Free"}
-                {ev.price_vip ? ` (VIP: $${ev.price_vip})` : ""}
-                {ev.price_vvip ? ` (VVIP: $${ev.price_vvip})` : ""}
+                Date:{" "}
+                {ev.date
+                  ? new Date(ev.date).toLocaleDateString()
+                  : "No date"}
               </p>
 
+              <p>Location: {ev.location}</p>
+
+              {renderStages(ev)}
+
               <p>
-                Featured:{" "}
-                <span
-                  className={
-                    ev.is_featured
-                      ? styles.featuredYes
-                      : styles.featuredNo
-                  }
-                >
-                  {ev.is_featured ? "Yes" : "No"}
-                </span>
+                Featured: {ev.is_featured ? "Yes" : "No"}
               </p>
 
               <button
-                className={styles.featuredButton}
                 onClick={() => toggleFeatured(ev.id)}
                 disabled={updatingId === ev.id}
               >
                 {updatingId === ev.id
                   ? "Updating..."
                   : ev.is_featured
-                  ? "Remove from Featured"
-                  : "Mark as Featured"}
+                  ? "Remove Featured"
+                  : "Make Featured"}
               </button>
             </div>
           ))}

@@ -1,13 +1,14 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import style from "../../styles/bookings/bookevent.module.css";
 
 export default function BookEventPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const eventIdRaw = searchParams.get("event_id");
   const eventId = eventIdRaw ? parseInt(eventIdRaw, 10) : null;
 
@@ -17,11 +18,10 @@ export default function BookEventPage() {
   const [quantity, setQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch event data
   useEffect(() => {
-    async function fetchEvent() {
-      if (!eventId) return;
+    if (!eventId) return;
 
+    async function fetchEvent() {
       try {
         const { data, error } = await supabase
           .from("events")
@@ -30,12 +30,13 @@ export default function BookEventPage() {
           .single();
 
         if (error || !data) throw error || new Error("Event not found");
+
         setEvent(data);
 
-        // Set default ticket type if available
-        if (data.price_regular) setTicketType("regular");
-        else if (data.price_vip) setTicketType("vip");
+        // default ticket type
+        if (data.price_vip) setTicketType("vip");
         else if (data.price_vvip) setTicketType("vvip");
+        else setTicketType("regular");
 
       } catch (err) {
         console.error(err);
@@ -48,26 +49,81 @@ export default function BookEventPage() {
     fetchEvent();
   }, [eventId]);
 
-  // Get ticket price
-  const getPrice = () => {
-    if (!event) return 0;
-    switch (ticketType) {
-      case "vip":
-        return event.price_vip || 0;
-      case "vvip":
-        return event.price_vvip || 0;
-      default:
-        return event.price_regular || 0;
-    }
+  // =========================
+  // EVENT EXPIRED CHECK
+  // =========================
+  const isEventExpired = () => {
+    if (!event?.date) return true;
+    return new Date(event.date) < new Date();
   };
 
-  // Handle booking
+  // =========================
+  // STAGE PRICE LOGIC
+  // =========================
+  const getActiveRegularPrice = () => {
+    if (!event) return 0;
+
+    const stages = event.price_regular_stages || {};
+    const ends = event.end_date_stages || {};
+    const now = new Date();
+
+    const isActive = (endDate) => {
+      if (!endDate) return false;
+      return new Date(endDate) >= now;
+    };
+
+    if (stages.early?.price > 0 && isActive(ends.early)) {
+      return stages.early.price;
+    }
+
+    if (stages.round2?.price > 0 && isActive(ends.round2)) {
+      return stages.round2.price;
+    }
+
+    if (stages.round3?.price > 0 && isActive(ends.round3)) {
+      return stages.round3.price;
+    }
+
+    return 0;
+  };
+
+  // =========================
+  // FINAL PRICE
+  // =========================
+  const getPrice = () => {
+    if (!event) return 0;
+
+    if (ticketType === "vip") return event.price_vip || 0;
+    if (ticketType === "vvip") return event.price_vvip || 0;
+
+    return getActiveRegularPrice();
+  };
+
+  // =========================
+  // BOOKING
+  // =========================
   async function handleBook() {
     if (!event) return;
+
+    if (isEventExpired()) {
+      alert("This event has expired");
+      return;
+    }
+
+    const price = getPrice();
+
+    if (price <= 0) {
+      alert("Tickets are no longer available");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
         alert("You must be logged in to book");
         router.push("/login");
@@ -84,7 +140,7 @@ export default function BookEventPage() {
           event_id: event.id,
           tickets: quantity,
           ticket_type: ticketType,
-          total_price: getPrice() * quantity,
+          total_price: price * quantity,
         }),
       });
 
@@ -92,7 +148,6 @@ export default function BookEventPage() {
       if (!res.ok) throw new Error(result.error || "Booking failed");
 
       alert("Booking successful!");
-
     } catch (err) {
       console.error(err);
       alert(err.message);
@@ -101,41 +156,77 @@ export default function BookEventPage() {
     }
   }
 
+  // =========================
+  // LOADING / ERROR
+  // =========================
   if (loading) return <p className="p-6">Loading event...</p>;
+
   if (!event) return <p className="p-6">Event not found</p>;
 
+  if (isEventExpired()) {
+    return <p className="p-6">This event has expired</p>;
+  }
+
+  // =========================
+  // UI
+  // =========================
   return (
     <div className={style.bookeventcontainer}>
       <h1 className={style.eventTitle}>{event.title}</h1>
       <p>{event.description}</p>
-      <p className={style.eventLocation}>Location: {event.location}</p>
-      <p className={style.eventDate}>Date: {new Date(event.date).toLocaleDateString()}</p>
 
+      <p className={style.eventLocation}>
+        Location: {event.location}
+      </p>
+
+      <p className={style.eventDate}>
+        Date: {new Date(event.date).toLocaleDateString()}
+      </p>
+
+      {/* TICKET TYPE */}
       <div className="mt-4 flex flex-col gap-3">
         <label>
           Ticket Type:
           <select
             value={ticketType}
-            onChange={e => setTicketType(e.target.value)}
+            onChange={(e) => setTicketType(e.target.value)}
             className={style.ticketTypeSelect}
           >
-            {event.price_regular != null && <option value="regular">Regular (${event.price_regular})</option>}
-            {event.price_vip != null && <option value="vip">VIP (${event.price_vip})</option>}
-            {event.price_vvip != null && <option value="vvip">VVIP (${event.price_vvip})</option>}
+            {getActiveRegularPrice() > 0 && (
+              <option value="regular">
+                Regular (${getActiveRegularPrice()})
+              </option>
+            )}
+
+            {event.price_vip != null && (
+              <option value="vip">
+                VIP (${event.price_vip})
+              </option>
+            )}
+
+            {event.price_vvip != null && (
+              <option value="vvip">
+                VVIP (${event.price_vvip})
+              </option>
+            )}
           </select>
         </label>
 
+        {/* QUANTITY */}
         <label>
           Quantity:
           <input
             type="number"
             min={1}
             max={event.ticket_limit || 10}
-            value={isNaN(quantity) ? 1 : quantity} // Prevent NaN
-            onChange={e => {
-              const val = parseInt(e.target.value, 10);
-              setQuantity(isNaN(val) ? 1 : val); // Fallback to 1
-            }}
+            value={isNaN(quantity) ? 1 : quantity}
+            onChange={(e) =>
+              setQuantity(
+                isNaN(parseInt(e.target.value, 10))
+                  ? 1
+                  : parseInt(e.target.value, 10)
+              )
+            }
             className="border p-2 rounded w-full mt-1"
           />
         </label>

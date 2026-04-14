@@ -135,7 +135,7 @@ export default function CategoriesPage() {
                     {cat.description}
                   </p>
 
-                  {cat.description?.length > 10 && (
+                  {cat.description?.length > 80 && (
                     <span
                       onClick={() => toggleDescription(cat.id)}
                       className="show-more-text"

@@ -1,52 +1,40 @@
 import { NextResponse } from "next/server";
-import { supabase } from "../../../../lib/supabase";
+import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getCurrentStage } from "../../../../lib/stageHelper";
 
-export async function GET(req) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const category_id = searchParams.get("category_id");
-
-    console.log("Received category_id:", category_id);
-
-    // Select all fields including separate ticket prices
-    let query = supabase
+    const { data, error } = await supabaseAdmin
       .from("events")
-      .select(`
-        id,
-        title,
-        description,
-        date,
-        location,
-        category_id,
-        price_regular,
-        price_vip,
-        price_vvip,
-        image_url,
-        is_featured,
-        created_at,
-        created_by
-      `)
-      .order("date", { ascending: true });
-
-    if (category_id) {
-      query = query.eq("category_id", Number(category_id));
-      console.log("Filtering by category_id:", Number(category_id));
-    }
-
-    const { data, error } = await query;
+      .select("*");
 
     if (error) {
-      console.error("Supabase error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
     }
 
-    console.log("Fetched events:", data);
+    const eventsWithStage = (data || []).map((event) => {
+      const current = getCurrentStage({
+        ...event,
+        end_date_stages: event.end_date_stages || {},
+        price_regular_stages: event.price_regular_stages || {},
+      });
 
-    return NextResponse.json({ events: data || [] }, { status: 200 });
+      return {
+        ...event,
+        current_stage: current?.stage || null,
+        current_price: current?.price || 0,
+      };
+    });
+
+    return NextResponse.json(eventsWithStage);
   } catch (err) {
-    console.error("API error:", err);
+    console.error("GET /events error:", err);
+
     return NextResponse.json(
-      { error: "Failed to fetch events" },
+      { error: "Server error" },
       { status: 500 }
     );
   }

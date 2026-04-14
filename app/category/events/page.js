@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import { useSearchParams, useRouter } from "next/navigation";
 import styles from "../../styles/event/eventpage.module.css";
 
-export default function EventsPage() {
+export default function CategoryEventsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const categoryId = searchParams.get("category_id");
+
+  const categoryId = Number(searchParams.get("category_id"));
 
   const ADMIN = 5;
   const ORGANIZER = 6;
@@ -20,12 +21,8 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedDesc, setExpandedDesc] = useState({});
 
-  // -------------------
-  // Initialization
-  // -------------------
   useEffect(() => {
     if (!categoryId) {
-      alert("No category selected");
       router.push("/category");
       return;
     }
@@ -34,29 +31,31 @@ export default function EventsPage() {
 
   async function initialize() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const token = session?.access_token;
       if (!token) return;
 
       const res = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const { user } = await res.json();
       if (!user) return;
 
       setUserId(user.id);
       setRole(user.role_id);
 
-      // Fetch category name
-      const { data } = await supabase
+      const { data: cat } = await supabase
         .from("categories")
         .select("name")
         .eq("id", categoryId)
         .single();
 
-      if (data) setCategoryName(data.name);
+      if (cat) setCategoryName(cat.name);
 
-      // Fetch events
       fetchEvents(user.role_id, user.id);
     } catch (err) {
       console.error(err);
@@ -65,6 +64,7 @@ export default function EventsPage() {
 
   async function fetchEvents(userRole, userId) {
     setLoading(true);
+
     try {
       let query = supabase
         .from("events")
@@ -72,10 +72,24 @@ export default function EventsPage() {
         .eq("category_id", categoryId)
         .order("date", { ascending: true });
 
-      if (userRole === ORGANIZER) query = query.eq("created_by", userId);
+      if (userRole === ORGANIZER) {
+        query = query.eq("created_by", userId);
+      }
 
-      const { data } = await query;
-      setEvents(data || []);
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(error);
+        setEvents([]);
+        return;
+      }
+
+      // ✅ REMOVE EXPIRED EVENTS (EVENT DATE)
+      const activeEvents = (data || []).filter(ev =>
+        ev.date && new Date(ev.date) >= new Date()
+      );
+
+      setEvents(activeEvents);
     } catch (err) {
       console.error(err);
       setEvents([]);
@@ -84,66 +98,111 @@ export default function EventsPage() {
     }
   }
 
-  // -------------------
-  // Handlers
-  // -------------------
-  const handleCreateEvent = () => {
+  const handleCreateEvent = () =>
     router.push(`/category/events/add?category_id=${categoryId}`);
-  };
 
-  const handleEdit = (eventId) => {
+  const handleEdit = (eventId) =>
     router.push(`/category/events/edit/${eventId}?category_id=${categoryId}`);
-  };
+
+  const handleBook = (event) =>
+    router.push(`/bookings/bookevent?event_id=${event.id}`);
 
   const handleDelete = async (eventId) => {
     if (!confirm("Delete this event?")) return;
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return alert("Unauthorized");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      const res = await fetch("/api/events/delete", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ event_id: eventId }),
-      });
+    const res = await fetch("/api/events/delete", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ event_id: eventId }),
+    });
 
-      const result = await res.json();
+    const result = await res.json();
 
-      if (res.ok) {
-        fetchEvents(role, userId);
-      } else {
-        alert(result.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed");
+    if (res.ok) {
+      fetchEvents(role, userId);
+    } else {
+      alert(result.error || "Delete failed");
     }
   };
 
-  const handleBook = (event) => {
-    router.push(`/bookings/bookevent?event_id=${event.id}`);
+  const toggleDescription = (id) =>
+    setExpandedDesc((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+
+  const formatDate = (date) =>
+    date ? new Date(date).toLocaleDateString() : "";
+
+  // ✅ FILTER ACTIVE TICKETS ONLY
+  const isActiveTicket = (endDate) => {
+    if (!endDate) return true;
+    return new Date(endDate) >= new Date();
   };
 
-  const toggleDescription = (id) => {
-    setExpandedDesc(prev => ({ ...prev, [id]: !prev[id] }));
+  const renderTickets = (ev) => {
+    const stages = ev.price_regular_stages || {};
+    const ends = ev.end_date_stages || {};
+
+    const tickets = [];
+
+    const early = Number(stages?.early?.price || 0);
+    const round2 = Number(stages?.round2?.price || 0);
+    const round3 = Number(stages?.round3?.price || 0);
+
+    if (early > 0 && isActiveTicket(ends.early)) {
+      tickets.push(`Early ${early} (End: ${formatDate(ends.early)})`);
+    }
+
+    if (round2 > 0 && isActiveTicket(ends.round2)) {
+      tickets.push(`Round2 ${round2} (End: ${formatDate(ends.round2)})`);
+    }
+
+    if (round3 > 0 && isActiveTicket(ends.round3)) {
+      tickets.push(`Round3 ${round3} (End: ${formatDate(ends.round3)})`);
+    }
+
+    const vip = Number(ev.price_vip || 0);
+    const vvip = Number(ev.price_vvip || 0);
+
+    if (vip > 0) tickets.push(`VIP ${vip}`);
+    if (vvip > 0) tickets.push(`VVIP ${vvip}`);
+
+    if (tickets.length === 0) return <p>Free</p>;
+
+    return (
+      <div>
+        <strong>Tickets:</strong>
+        {tickets.map((t, i) => (
+          <p key={i}>{t}</p>
+        ))}
+      </div>
+    );
   };
 
-  // -------------------
-  // Render
-  // -------------------
-  if (loading) return <p className={styles["events-loading"]}>Loading events...</p>;
+  if (loading) {
+    return <p className={styles["events-loading"]}>Loading events...</p>;
+  }
 
   return (
     <div className={styles["events-container"]}>
       <div className={styles["events-header"]}>
-        <h1 className={styles["events-title"]}>Events in {categoryName}</h1>
+        <h1 className={styles["events-title"]}>
+          Events in {categoryName}
+        </h1>
+
         {(role === ADMIN || role === ORGANIZER) && (
-          <button className={styles["events-create-button"]} onClick={handleCreateEvent}>
+          <button
+            className={styles["events-create-button"]}
+            onClick={handleCreateEvent}
+          >
             Create Event
           </button>
         )}
@@ -153,15 +212,9 @@ export default function EventsPage() {
         <p className={styles["events-empty"]}>No events found</p>
       ) : (
         <div className={styles["events-grid"]}>
-          {events.map(ev => {
+          {events.map((ev) => {
             const isExpanded = expandedDesc[ev.id];
             const shortDesc = ev.description?.slice(0, 100) || "";
-
-            // Flexible pricing check
-            const regularStages = ev.price_regular_stages || {};
-            const allFree =
-              (!regularStages.early && !regularStages.round2 && !regularStages.round3 &&
-               (!ev.price_vip || ev.price_vip === 0) && (!ev.price_vvip || ev.price_vvip === 0));
 
             return (
               <div key={ev.id} className={styles["event-card"]}>
@@ -169,51 +222,62 @@ export default function EventsPage() {
                   src={ev.image_url || "/default-event.jpg"}
                   alt={ev.title}
                   className={styles["event-image"]}
-                  onError={e => (e.target.src = "/default-event.jpg")}
+                  onError={(e) =>
+                    (e.currentTarget.src = "/default-event.jpg")
+                  }
                 />
+
                 <h2 className={styles["event-name"]}>{ev.title}</h2>
 
+                {/* DESCRIPTION */}
                 {ev.description && (
-                  <div className={styles["event-description-wrapper"]}>
-                    <p className={`${styles["event-description"]} ${isExpanded ? styles.expanded : ""}`}>
-                      {isExpanded ? ev.description : shortDesc + (ev.description.length > 100 ? "..." : "")}
-                    </p>
+                  <p>
+                    {isExpanded
+                      ? ev.description
+                      : shortDesc +
+                        (ev.description.length > 100 ? "..." : "")}
+
                     {ev.description.length > 100 && (
-                      <button className={styles["show-more-text"]} onClick={() => toggleDescription(ev.id)}>
-                        {isExpanded ? "Read less" : "Read more"}
+                      <button onClick={() => toggleDescription(ev.id)}>
+                        {isExpanded ? "Less" : "More"}
                       </button>
                     )}
-                  </div>
+                  </p>
                 )}
 
-                <div className={styles["event-info-wrapper"]}>
-                  <p className={styles["event-info"]}><strong>Location:</strong> {ev.location}</p>
-                  <p className={styles["event-info"]}><strong>Date:</strong> {new Date(ev.date).toLocaleDateString()}</p>
-                  <p className={styles["event-info"]}>
-                    <strong>Price:</strong>{" "}
-                    {allFree
-                      ? "Free"
-                      : (
-                        <>
-                          {regularStages.early > 0 && <>Early: ${regularStages.early} </>}
-                          {regularStages.round2 > 0 && <>Round2: ${regularStages.round2} </>}
-                          {regularStages.round3 > 0 && <>Round3+: ${regularStages.round3} </>}
-                          {ev.price_vip > 0 && <>VIP: ${ev.price_vip} </>}
-                          {ev.price_vvip > 0 && <>VVIP: ${ev.price_vvip}</>}
-                        </>
-                      )
-                    }
+                {/* DATE + LOCATION */}
+                <div style={{ display: "flex", gap: "20px" }}>
+                  <p>
+                    <strong>Date:</strong> {formatDate(ev.date)}
+                  </p>
+
+                  <p>
+                    <strong>Location:</strong> {ev.location}
                   </p>
                 </div>
 
-                <div className={styles["event-actions"]}>
+                {/* TICKETS */}
+                {renderTickets(ev)}
+
+                {/* ACTIONS */}
+                <div>
                   {(role === ADMIN || role === ORGANIZER) && (
                     <>
-                      <button className={styles["event-edit-button"]} onClick={() => handleEdit(ev.id)}>Edit</button>
-                      <button className={styles["event-delete-button"]} onClick={() => handleDelete(ev.id)}>Delete</button>
+                      <button onClick={() => handleEdit(ev.id)}>
+                        Edit
+                      </button>
+
+                      <button onClick={() => handleDelete(ev.id)}>
+                        Delete
+                      </button>
                     </>
                   )}
-                  <button className={styles["event-book-button"]} onClick={() => handleBook(ev)}>Book</button>
+
+                  {role !== ADMIN && (
+                    <button onClick={() => handleBook(ev)}>
+                      Book
+                    </button>
+                  )}
                 </div>
               </div>
             );

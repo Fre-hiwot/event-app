@@ -8,6 +8,8 @@ import styles from "../../STYLE/dashboard/roleDashboard.module.css";
 export default function FeaturedEventsPage() {
   const ADMIN = 5;
   const ORGANIZER = 6;
+  const USER = 7;
+
   const router = useRouter();
 
   const [role, setRole] = useState(null);
@@ -19,33 +21,49 @@ export default function FeaturedEventsPage() {
     initialize();
   }, []);
 
+  // ======================
+  // INIT
+  // ======================
   async function initialize() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!token) throw new Error("Not logged in");
+      const token = session?.access_token;
+      if (!token) return;
 
       const res = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const { user } = await res.json();
 
-      if (!user) throw new Error("User data not found");
+      const { user } = await res.json();
+      if (!user) return;
 
       setRole(user.role_id);
       setUserId(user.id);
 
-      await fetchFeaturedEvents(user.id, user.role_id);
+      fetchFeaturedEvents(user.id, user.role_id);
     } catch (err) {
-      console.error("Initialization error:", err);
-      setEvents([]);
+      console.error(err);
       setLoading(false);
     }
   }
 
+  // ======================
+  // CHECK EVENT EXPIRY
+  // ======================
+  const isEventActive = (date) => {
+    if (!date) return true;
+    return new Date(date) >= new Date();
+  };
+
+  // ======================
+  // FETCH EVENTS
+  // ======================
   async function fetchFeaturedEvents(userId, role) {
     setLoading(true);
+
     try {
       let query = supabase
         .from("events")
@@ -53,7 +71,6 @@ export default function FeaturedEventsPage() {
         .eq("is_featured", true)
         .order("date", { ascending: true });
 
-      // Only organizers see their own featured events
       if (role === ORGANIZER) {
         query = query.eq("created_by", userId);
       }
@@ -61,31 +78,89 @@ export default function FeaturedEventsPage() {
       const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching featured events:", error);
+        console.error(error);
         setEvents([]);
-      } else {
-        setEvents(data || []);
+        return;
       }
+
+      // ✅ FILTER OUT EXPIRED EVENTS
+      const activeEvents = (data || []).filter(ev =>
+        isEventActive(ev.date)
+      );
+
+      setEvents(activeEvents);
+
     } catch (err) {
-      console.error("Unexpected error in fetchFeaturedEvents:", err);
+      console.error(err);
       setEvents([]);
     } finally {
       setLoading(false);
     }
   }
 
+  // ======================
+  // BOOK
+  // ======================
   function handleBook(eventId) {
     router.push(`/bookings/bookevent?event_id=${eventId}`);
   }
 
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "ETB",
-    }).format(Number(value));
+  // ======================
+  // RENDER EVENT
+  // ======================
+  function renderEvent(ev) {
+    const stages = ev.price_regular_stages || {};
+    const ends = ev.end_date_stages || {};
 
-  if (loading)
+    const early = Number(stages.early?.price || 0);
+    const round2 = Number(stages.round2?.price || 0);
+    const round3 = Number(stages.round3?.price || 0);
+    const vip = Number(ev.price_vip || 0);
+    const vvip = Number(ev.price_vvip || 0);
+
+    const renderLine = (label, price, end) => {
+      if (!price || price <= 0) return null;
+
+      return (
+        <p>
+          {label}: ${price}
+          {end && (
+            <>
+              {" "} | Ends:{" "}
+              {new Date(end).toLocaleDateString()}
+            </>
+          )}
+        </p>
+      );
+    };
+
+    return (
+      <>
+        <p>
+          Date:{" "}
+          {ev.date
+            ? new Date(ev.date).toLocaleDateString()
+            : "No date"}
+        </p>
+
+        <p>Location: {ev.location}</p>
+
+        {renderLine("Early", early, ends.early)}
+        {renderLine("Round2", round2, ends.round2)}
+        {renderLine("Round3", round3, ends.round3)}
+
+        {vip > 0 && <p>VIP: ${vip}</p>}
+        {vvip > 0 && <p>VVIP: ${vvip}</p>}
+      </>
+    );
+  }
+
+  // ======================
+  // LOADING
+  // ======================
+  if (loading) {
     return <div className={styles.page}>Loading featured events...</div>;
+  }
 
   return (
     <div className={styles.page}>
@@ -94,50 +169,28 @@ export default function FeaturedEventsPage() {
       {events.length === 0 ? (
         <div className={styles.emptyStateCard}>
           <p>
-            No featured events {role === ORGANIZER ? "created by you" : ""}.
+            No featured events{" "}
+            {role === ORGANIZER ? "created by you" : ""}.
           </p>
         </div>
       ) : (
         <div className={styles.eventList}>
-          {events.map((ev) => {
-            const prices = [
-              { label: "Regular", value: Number(ev.price_regular) },
-              { label: "VIP", value: Number(ev.price_vip) },
-              { label: "VVIP", value: Number(ev.price_vvip) },
-            ].filter((p) => p.value > 0);
+          {events.map((ev) => (
+            <div key={ev.id} className={styles.eventCard}>
+              <img
+                src={ev.image_url || "/default-event.jpg"}
+                className={styles.eventImage}
+                onError={(e) =>
+                  (e.currentTarget.src = "/default-event.jpg")
+                }
+              />
 
-            const allFree = prices.length === 0;
+              <h3 className={styles.eventTitle}>{ev.title}</h3>
 
-            return (
-              <div key={ev.id} className={styles.eventCard}>
-                <img
-                  src={ev.image_url || "/default-event.jpg"}
-                  alt={ev.title}
-                  className={styles.eventImage}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/default-event.jpg";
-                  }}
-                />
-                <h3 className={styles.eventTitle}>{ev.title}</h3>
-                <p>Date: {new Date(ev.date).toLocaleDateString()}</p>
-                <p>Location: {ev.location}</p>
+              {renderEvent(ev)}
 
-                {allFree ? (
-                  <p>Price: Free</p>
-                ) : prices.length === 1 ? (
-                  <p>Price: {formatCurrency(prices[0].value)}</p>
-                ) : (
-                  <div>
-                    <p><strong>Ticket Options:</strong></p>
-                    {prices.map((p) => (
-                      <p key={p.label}>
-                        {p.label}: {formatCurrency(p.value)}
-                      </p>
-                    ))}
-                  </div>
-                )}
-
+              {/* BOOK BUTTON ONLY USER + ORGANIZER */}
+              {(role === USER || role === ORGANIZER) && (
                 <div className={styles.buttonGroup}>
                   <button
                     onClick={() => handleBook(ev.id)}
@@ -146,9 +199,9 @@ export default function FeaturedEventsPage() {
                     Book
                   </button>
                 </div>
-              </div>
-            );
-          })}
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -218,9 +218,9 @@ export default function RoleBasedDashboard({ children }) {
           {profile.role_id === 7 && (
             <>
               <Link
-                href="/dashboard/user"
+                href="/category"
                 className={`${styles.navLink} ${
-                  isActive("/dashboard/user") ? styles.activeLink : ""
+                  isActive("/category") ? styles.activeLink : ""
                 }`}
               >
                 <Home size={18} className={styles.navIcon} /> Browse Events

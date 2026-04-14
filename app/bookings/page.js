@@ -19,6 +19,28 @@ export default function BookingsPage() {
     fetchBookingsSummary();
   }, []);
 
+  // =========================
+  // CHECK EVENT ACTIVE
+  // =========================
+  const isEventActive = (ev) => {
+    const now = new Date();
+
+    const eventNotExpired =
+      !ev.date || new Date(ev.date) >= now;
+
+    const ends = ev.end_date_stages || {};
+
+    const hasActiveStage = Object.values(ends).some((end) => {
+      if (!end) return true;
+      return new Date(end) >= now;
+    });
+
+    return eventNotExpired && hasActiveStage;
+  };
+
+  // =========================
+  // FETCH SUMMARY
+  // =========================
   async function fetchBookingsSummary() {
     setLoading(true);
 
@@ -35,37 +57,30 @@ export default function BookingsPage() {
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from("users")
         .select("id, role_id")
         .eq("auth_id", user.id)
         .single();
 
-      if (profileError || !profile) {
-        console.error("PROFILE ERROR:", profileError);
-        alert("Failed to get user role");
-        return;
-      }
-
       setRole(profile.role_id);
 
-      let query = supabase
-        .from("bookings")
-        .select(`
-          id,
-          event_id,
-          status,
-          user_id,
-          tickets,
-          total_price,
-          events!inner(
-            title,
-            date,
-            location,
-            image_url,
-            created_by
-          )
-        `);
+      let query = supabase.from("bookings").select(`
+        id,
+        event_id,
+        status,
+        user_id,
+        tickets,
+        total_price,
+        events!inner(
+          title,
+          date,
+          location,
+          image_url,
+          created_by,
+          end_date_stages
+        )
+      `);
 
       if (profile.role_id === ORGANIZER_ROLE) {
         query = query.eq("events.created_by", profile.id);
@@ -73,20 +88,22 @@ export default function BookingsPage() {
         query = query.eq("user_id", profile.id);
       }
 
-      const { data, error } = await query;
+      const { data } = await query;
 
-      if (error) {
-        console.error("SUPABASE ERROR:", error);
-        throw error;
-      }
+      // ❌ REMOVE EXPIRED EVENTS
+      const activeData = (data || []).filter((b) =>
+        isEventActive(b.events)
+      );
 
       let summary = [];
 
-      // ADMIN / ORGANIZER
-      if (profile.role_id === ADMIN_ROLE || profile.role_id === ORGANIZER_ROLE) {
+      if (
+        profile.role_id === ADMIN_ROLE ||
+        profile.role_id === ORGANIZER_ROLE
+      ) {
         const grouped = {};
 
-        data.forEach((b) => {
+        activeData.forEach((b) => {
           const eid = b.event_id;
 
           if (!grouped[eid]) {
@@ -112,19 +129,19 @@ export default function BookingsPage() {
           grouped[eid].totalTickets += tickets;
           grouped[eid].totalRevenue += Number(b.total_price) || 0;
 
-          if (status === "pending") grouped[eid].statusCount.pending += tickets;
-          else if (status === "confirmed") grouped[eid].statusCount.confirmed += tickets;
-          else if (status === "cancelled") grouped[eid].statusCount.cancelled += tickets;
+          if (status === "pending")
+            grouped[eid].statusCount.pending += tickets;
+          else if (status === "confirmed")
+            grouped[eid].statusCount.confirmed += tickets;
+          else if (status === "cancelled")
+            grouped[eid].statusCount.cancelled += tickets;
         });
 
         summary = Object.values(grouped);
-      }
-
-      // USER (GROUPED)
-      else {
+      } else {
         const grouped = {};
 
-        data.forEach((b) => {
+        activeData.forEach((b) => {
           const eid = b.event_id;
 
           if (!grouped[eid]) {
@@ -150,16 +167,18 @@ export default function BookingsPage() {
           grouped[eid].totalTickets += tickets;
           grouped[eid].totalSpent += Number(b.total_price) || 0;
 
-          if (status === "pending") grouped[eid].statusCount.pending += tickets;
-          else if (status === "confirmed") grouped[eid].statusCount.confirmed += tickets;
-          else if (status === "cancelled") grouped[eid].statusCount.cancelled += tickets;
+          if (status === "pending")
+            grouped[eid].statusCount.pending += tickets;
+          else if (status === "confirmed")
+            grouped[eid].statusCount.confirmed += tickets;
+          else if (status === "cancelled")
+            grouped[eid].statusCount.cancelled += tickets;
         });
 
         summary = Object.values(grouped);
       }
 
       setEventsSummary(summary);
-
     } catch (err) {
       console.error("FINAL ERROR:", err);
       alert("Failed to fetch bookings summary");
@@ -168,6 +187,9 @@ export default function BookingsPage() {
     }
   }
 
+  // =========================
+  // FILTER
+  // =========================
   const filteredSummary = eventsSummary.filter((e) => {
     const name = e.title?.toLowerCase() || "";
     const eventDateStr = e.date
@@ -180,6 +202,9 @@ export default function BookingsPage() {
     );
   });
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div className={styles["events-container"]}>
       <div className={styles["events-header"]}>
@@ -190,7 +215,7 @@ export default function BookingsPage() {
         </h1>
       </div>
 
-      {/* Filters */}
+      {/* FILTERS */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <input
           type="text"
@@ -218,7 +243,7 @@ export default function BookingsPage() {
         </button>
       </div>
 
-      {/* Content */}
+      {/* CONTENT */}
       {loading ? (
         <p className={styles["events-loading"]}>Loading...</p>
       ) : filteredSummary.length === 0 ? (
@@ -229,51 +254,45 @@ export default function BookingsPage() {
             <div key={e.event_id} className={styles["event-card"]}>
               <img
                 src={e.image_url || "/default-event.jpg"}
-                alt={e.title}
                 className={styles["event-image"]}
               />
 
               <h2 className={styles["event-name"]}>{e.title}</h2>
 
-              <p className={styles["event-info"]}>
+              <p>
                 <strong>Location:</strong> {e.location}
               </p>
 
-              <p className={styles["event-info"]}>
+              <p>
                 <strong>Date:</strong>{" "}
                 {e.date ? new Date(e.date).toLocaleDateString() : "N/A"}
               </p>
 
+              {/* TOTAL */}
+              <p><strong>Total Tickets:</strong> {e.totalTickets}</p>
+
+              {/* STATUS BREAKDOWN */}
+              <div style={{ marginTop: "8px" }}>
+                <p style={{ color: "#eab308" }}>
+                  Pending: {e.statusCount?.pending || 0}
+                </p>
+                <p style={{ color: "#22c55e" }}>
+                  Confirmed: {e.statusCount?.confirmed || 0}
+                </p>
+                <p style={{ color: "#ef4444" }}>
+                  Cancelled: {e.statusCount?.cancelled || 0}
+                </p>
+              </div>
+
+              {/* ADMIN / USER FINANCIAL */}
               {role === ADMIN_ROLE || role === ORGANIZER_ROLE ? (
-                <>
-                  <p><strong>Total Tickets:</strong> {e.totalTickets || 0}</p>
-                  <p><strong>Total Revenue:</strong> ${e.totalRevenue || 0}</p>
-
-                  <p className="text-yellow-600">
-                    Pending: {e.statusCount?.pending || 0}
-                  </p>
-                  <p className="text-green-600">
-                    Confirmed: {e.statusCount?.confirmed || 0}
-                  </p>
-                  <p className="text-red-600">
-                    Cancelled: {e.statusCount?.cancelled || 0}
-                  </p>
-                </>
+                <p>
+                  <strong>Total Revenue:</strong> ${e.totalRevenue}
+                </p>
               ) : (
-                <>
-                  <p><strong>Total Tickets:</strong> {e.totalTickets || 0}</p>
-                  <p><strong>Total Spent:</strong> ${e.totalSpent || 0}</p>
-
-                  <p className="text-yellow-600">
-                    Pending: {e.statusCount?.pending || 0}
-                  </p>
-                  <p className="text-green-600">
-                    Confirmed: {e.statusCount?.confirmed || 0}
-                  </p>
-                  <p className="text-red-600">
-                    Cancelled: {e.statusCount?.cancelled || 0}
-                  </p>
-                </>
+                <p>
+                  <strong>Total Spent:</strong> ${e.totalSpent}
+                </p>
               )}
             </div>
           ))}

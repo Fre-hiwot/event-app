@@ -3,6 +3,7 @@ import { supabase } from "../../../../lib/supabase";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { auditLogger } from "../../../../lib/auditLogger";
 
+export const runtime = "nodejs"; // prevents static pre-render errors
 export async function POST(req) {
   try {
     const authHeader = req.headers.get("authorization");
