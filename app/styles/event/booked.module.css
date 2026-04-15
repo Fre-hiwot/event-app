@@ -1,0 +1,105 @@
+.eventsContainer {
+  padding: 24px;
+  background: #f6f7fb;
+  min-height: 100vh;
+}
+
+/* HEADER */
+.eventsHeader {
+  margin-bottom: 20px;
+}
+
+.eventsTitle {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* FILTERS */
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+}
+
+.input:focus {
+  border-color: #6366f1;
+  outline: none;
+}
+
+.clearBtn {
+  padding: 10px 14px;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+/* CARD */
+.card {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* IMAGE */
+.image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* TEXT */
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 10px;
+  color: #111827;
+}
+
+/* STATUS */
+.pending {
+  color: #eab308;
+}
+
+.confirmed {
+  color: #22c55e;
+}
+
+.cancelled {
+  color: #ef4444;
+}
+
+/* REVENUE */
+.revenue {
+  font-weight: bold;
+  margin-top: 10px;
+  color: #1f2937;
+}
+
+/* STATES */
+.loading,
+.empty {
+  text-align: center;
+  margin-top: 40px;
+  color: #6b7280;
+}

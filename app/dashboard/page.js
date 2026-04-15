@@ -21,9 +21,6 @@ export default function FeaturedEventsPage() {
     initialize();
   }, []);
 
-  // ======================
-  // INIT
-  // ======================
   async function initialize() {
     try {
       const {
@@ -31,51 +28,46 @@ export default function FeaturedEventsPage() {
       } = await supabase.auth.getSession();
 
       const token = session?.access_token;
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const res = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const { user } = await res.json();
-      if (!user) return;
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       setRole(user.role_id);
       setUserId(user.id);
 
-      fetchFeaturedEvents(user.id, user.role_id);
+      await fetchFeaturedEvents();
     } catch (err) {
-      console.error(err);
+      console.error("INIT ERROR:", err);
+    } finally {
       setLoading(false);
     }
   }
 
-  // ======================
-  // CHECK EVENT EXPIRY
-  // ======================
+  // ✅ SAFE DATE CHECK
   const isEventActive = (date) => {
     if (!date) return true;
-    return new Date(date) >= new Date();
+    return new Date(date.replace(" ", "T")) >= new Date();
   };
 
-  // ======================
-  // FETCH EVENTS
-  // ======================
-  async function fetchFeaturedEvents(userId, role) {
-    setLoading(true);
-
+  async function fetchFeaturedEvents() {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("events")
         .select("*")
         .eq("is_featured", true)
         .order("date", { ascending: true });
-
-      if (role === ORGANIZER) {
-        query = query.eq("created_by", userId);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error(error);
@@ -83,38 +75,33 @@ export default function FeaturedEventsPage() {
         return;
       }
 
-      // ✅ FILTER OUT EXPIRED EVENTS
-      const activeEvents = (data || []).filter(ev =>
+      const activeEvents = (data || []).filter((ev) =>
         isEventActive(ev.date)
       );
 
       setEvents(activeEvents);
-
     } catch (err) {
       console.error(err);
       setEvents([]);
-    } finally {
-      setLoading(false);
     }
   }
 
-  // ======================
-  // BOOK
-  // ======================
   function handleBook(eventId) {
     router.push(`/bookings/bookevent?event_id=${eventId}`);
   }
 
-  // ======================
-  // RENDER EVENT
-  // ======================
+  // =========================
+  // ✅ FIXED PRICE PARSING HERE
+  // =========================
   function renderEvent(ev) {
     const stages = ev.price_regular_stages || {};
     const ends = ev.end_date_stages || {};
 
-    const early = Number(stages.early?.price || 0);
-    const round2 = Number(stages.round2?.price || 0);
-    const round3 = Number(stages.round3?.price || 0);
+    // 🔥 FIX: backend stores NUMBER, not {price}
+    const early = Number(stages.early || 0);
+    const round2 = Number(stages.round2 || 0);
+    const round3 = Number(stages.round3 || 0);
+
     const vip = Number(ev.price_vip || 0);
     const vvip = Number(ev.price_vvip || 0);
 
@@ -124,12 +111,7 @@ export default function FeaturedEventsPage() {
       return (
         <p>
           {label}: ${price}
-          {end && (
-            <>
-              {" "} | Ends:{" "}
-              {new Date(end).toLocaleDateString()}
-            </>
-          )}
+          {end && <> | Ends: {new Date(end).toLocaleDateString()}</>}
         </p>
       );
     };
@@ -139,7 +121,7 @@ export default function FeaturedEventsPage() {
         <p>
           Date:{" "}
           {ev.date
-            ? new Date(ev.date).toLocaleDateString()
+            ? new Date(ev.date.replace(" ", "T")).toLocaleDateString()
             : "No date"}
         </p>
 
@@ -155,9 +137,6 @@ export default function FeaturedEventsPage() {
     );
   }
 
-  // ======================
-  // LOADING
-  // ======================
   if (loading) {
     return <div className={styles.page}>Loading featured events...</div>;
   }
@@ -168,10 +147,7 @@ export default function FeaturedEventsPage() {
 
       {events.length === 0 ? (
         <div className={styles.emptyStateCard}>
-          <p>
-            No featured events{" "}
-            {role === ORGANIZER ? "created by you" : ""}.
-          </p>
+          <p>No featured events available.</p>
         </div>
       ) : (
         <div className={styles.eventList}>
@@ -180,6 +156,7 @@ export default function FeaturedEventsPage() {
               <img
                 src={ev.image_url || "/default-event.jpg"}
                 className={styles.eventImage}
+                alt={ev.title}
                 onError={(e) =>
                   (e.currentTarget.src = "/default-event.jpg")
                 }
@@ -189,7 +166,6 @@ export default function FeaturedEventsPage() {
 
               {renderEvent(ev)}
 
-              {/* BOOK BUTTON ONLY USER + ORGANIZER */}
               {(role === USER || role === ORGANIZER) && (
                 <div className={styles.buttonGroup}>
                   <button

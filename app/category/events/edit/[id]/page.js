@@ -34,7 +34,7 @@ export default function EditEventPage() {
 
   const [date, setDate] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // ✅ already exists
   const [ticketLimit, setTicketLimit] = useState("");
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function EditEventPage() {
 
       setDate(event.date?.split("T")[0] || "");
       setCategoryId(event.category_id || "");
-      setImageUrl(event.image_url || "");
+      setImageUrl(event.image_url || ""); // ✅ load image
       setTicketLimit(event.ticket_limit || "");
 
       const { data: cats } = await supabase.from("categories").select("*");
@@ -117,7 +117,7 @@ export default function EditEventPage() {
         price_vvip: vvip,
         date,
         category_id: categoryId,
-        image_url: imageUrl,
+        image_url: imageUrl, // ✅ send image
         ticket_limit: ticketLimit,
       }),
     });
@@ -167,6 +167,24 @@ export default function EditEventPage() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+
+            {/* ✅ IMAGE INPUT */}
+        <h3>Image</h3>
+        <input
+          placeholder="Image URL"
+          value={imageUrl}
+          onChange={e => setImageUrl(e.target.value)}
+        />
+
+        {/* ✅ IMAGE PREVIEW */}
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt="Preview"
+            className={styles.imagePreview}
+            
+          />
+        )}
 
         <button disabled={saving}>
           {saving ? "Updating..." : "Update"}

@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import styles from "../../styles/event/featuredEvent.module.css";
+import styles from "../../../STYLE/dashboard/roleDashboard.module.css";
 
-export default function FeaturedManagementPage() {
+export default function FeaturedEventsPage() {
   const ADMIN = 5;
   const ORGANIZER = 6;
+  const USER = 7;
 
-  const [events, setEvents] = useState([]);
+  const router = useRouter();
+
   const [role, setRole] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
 
@@ -18,9 +22,9 @@ export default function FeaturedManagementPage() {
     initialize();
   }, []);
 
-  // =========================
+  // ======================
   // INIT
-  // =========================
+  // ======================
   async function initialize() {
     try {
       const {
@@ -28,16 +32,18 @@ export default function FeaturedManagementPage() {
       } = await supabase.auth.getSession();
 
       const token = session?.access_token;
+
       if (!token) {
         setLoading(false);
         return;
       }
 
-      const resUser = await fetch("/api/users/me", {
+      const res = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const { user } = await resUser.json();
+      const { user } = await res.json();
+
       if (!user) {
         setLoading(false);
         return;
@@ -46,151 +52,124 @@ export default function FeaturedManagementPage() {
       setRole(user.role_id);
       setUserId(user.id);
 
-      await fetchEvents(user.role_id, user.id, token);
+      await fetchEvents(user.id, user.role_id);
     } catch (err) {
-      console.error("Initialization failed:", err);
-      setLoading(false);
-    }
-  }
-
-  // =========================
-  // ONLY DATE CHECK (IMPORTANT)
-  // =========================
-  const isEventActive = (date) => {
-    if (!date) return false;
-    return new Date(date).getTime() >= Date.now();
-  };
-
-  // =========================
-  // FETCH EVENTS (FILTERED)
-  // =========================
-  async function fetchEvents(userRole, userId, token) {
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/events/get", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await res.json();
-
-      let events = Array.isArray(data) ? data : data.events || [];
-
-      // ORGANIZER ONLY THEIR EVENTS
-      if (userRole === ORGANIZER) {
-        events = events.filter((ev) => ev.created_by === userId);
-      }
-
-      // ❌ REMOVE EXPIRED EVENTS (ONLY BY DATE)
-      const activeEvents = events.filter((ev) =>
-        isEventActive(ev.date)
-      );
-
-      setEvents(activeEvents);
-    } catch (err) {
-      console.error("Fetch events failed:", err);
-      setEvents([]);
+      console.error("INIT ERROR:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  // =========================
-  // TOGGLE FEATURED
-  // =========================
-  async function toggleFeatured(eventId) {
+  // ======================
+  // FETCH EVENTS
+  // ======================
+  async function fetchEvents(userId, role) {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const now = new Date().toISOString();
 
-      const token = session?.access_token;
-      if (!token) return alert("Not authenticated");
+      let query = supabase
+        .from("events")
+        .select("*")
+        .gte("date", now)
+        .order("date", { ascending: true });
 
-      const event = events.find((ev) => ev.id === eventId);
-      if (!event) return;
+      // ✅ ORGANIZER ONLY SEES THEIR OWN EVENTS
+      if (role === ORGANIZER) {
+        query = query.eq("created_by", userId);
+      }
 
-      const newFeatured = !event.is_featured;
-      setUpdatingId(eventId);
+      const { data, error } = await query;
 
+      if (error) {
+        console.error("FETCH ERROR:", error);
+        setEvents([]);
+        return;
+      }
+
+      setEvents(data || []);
+    } catch (err) {
+      console.error(err);
+      setEvents([]);
+    }
+  }
+
+  // ======================
+  // PERMISSION CHECK
+  // ======================
+  function canEditFeatured(ev) {
+    if (role === ADMIN) return true;
+    if (role === ORGANIZER && ev.created_by === userId) return true;
+    return false;
+  }
+
+  // ======================
+  // TOGGLE FEATURED
+  // ======================
+  async function toggleFeatured(eventId, currentValue, ev) {
+    if (!canEditFeatured(ev)) {
+      alert("You don't have permission to modify this event");
+      return;
+    }
+
+    setUpdatingId(eventId);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      alert("No session found");
+      setUpdatingId(null);
+      return;
+    }
+
+    try {
       const res = await fetch("/api/events/update/featured", {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           event_id: eventId,
-          is_featured: newFeatured,
+          is_featured: !currentValue,
         }),
       });
 
       const result = await res.json();
+
       if (!res.ok) throw new Error(result.error);
 
       setEvents((prev) =>
-        prev.map((ev) =>
-          ev.id === eventId
-            ? { ...ev, is_featured: newFeatured }
-            : ev
+        prev.map((item) =>
+          item.id === eventId
+            ? { ...item, is_featured: !item.is_featured }
+            : item
         )
       );
     } catch (err) {
       console.error(err);
-      alert("Failed to update featured status");
+      alert(err.message || "Failed to update featured status");
     } finally {
       setUpdatingId(null);
     }
   }
 
-  // =========================
-  // STAGES DISPLAY (UNCHANGED)
-  // =========================
-  function renderStages(ev) {
-    const stages = ev.price_regular_stages || {};
-    const ends = ev.end_date_stages || {};
-
-    return (
-      <div>
-        <p>
-          Early: ${stages.early?.price || 0} | End:{" "}
-          {ends.early ? new Date(ends.early).toLocaleDateString() : "N/A"}
-        </p>
-
-        <p>
-          Round2: ${stages.round2?.price || 0} | End:{" "}
-          {ends.round2 ? new Date(ends.round2).toLocaleDateString() : "N/A"}
-        </p>
-
-        <p>
-          Round3: ${stages.round3?.price || 0} | End:{" "}
-          {ends.round3 ? new Date(ends.round3).toLocaleDateString() : "N/A"}
-        </p>
-
-        <p>VIP: ${ev.price_vip || 0}</p>
-        <p>VVIP: ${ev.price_vvip || 0}</p>
-      </div>
-    );
+  // ======================
+  // LOADING
+  // ======================
+  if (loading) {
+    return <div className={styles.page}>Loading events...</div>;
   }
 
-  // =========================
-  // LOADING / ACCESS
-  // =========================
-  if (loading) return <p className={styles.page}>Loading...</p>;
-
-  if (role !== ADMIN && role !== ORGANIZER) {
-    return <p className={styles.page}>No access</p>;
-  }
-
-  // =========================
-  // UI
-  // =========================
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Manage Featured Events</h1>
+      <h1 className={styles.title}>Events</h1>
 
       {events.length === 0 ? (
-        <p>No events found</p>
+        <div className={styles.emptyStateCard}>
+          <p>No events found.</p>
+        </div>
       ) : (
         <div className={styles.eventList}>
           {events.map((ev) => (
@@ -198,35 +177,40 @@ export default function FeaturedManagementPage() {
               <img
                 src={ev.image_url || "/default-event.jpg"}
                 className={styles.eventImage}
+                alt={ev.title}
               />
 
-              <h3>{ev.title}</h3>
+              <h3 className={styles.eventTitle}>{ev.title}</h3>
 
               <p>
                 Date:{" "}
                 {ev.date
-                  ? new Date(ev.date).toLocaleDateString()
+                  ? new Date(ev.date).toLocaleString()
                   : "No date"}
               </p>
 
               <p>Location: {ev.location}</p>
 
-              {renderStages(ev)}
-
-              <p>
-                Featured: {ev.is_featured ? "Yes" : "No"}
-              </p>
-
-              <button
-                onClick={() => toggleFeatured(ev.id)}
-                disabled={updatingId === ev.id}
-              >
-                {updatingId === ev.id
-                  ? "Updating..."
-                  : ev.is_featured
-                  ? "Remove Featured"
-                  : "Make Featured"}
-              </button>
+              {/* FEATURE BUTTON */}
+              {canEditFeatured(ev) && (
+                <button
+                  onClick={() =>
+                    toggleFeatured(ev.id, ev.is_featured, ev)
+                  }
+                  disabled={updatingId === ev.id}
+                  className={`${styles.featureButton} ${
+                    ev.is_featured
+                      ? styles.featured
+                      : styles.notFeatured
+                  }`}
+                >
+                  {updatingId === ev.id
+                    ? "Updating..."
+                    : ev.is_featured
+                    ? "Remove Featured"
+                    : "Add Featured"}
+                </button>
+              )}
             </div>
           ))}
         </div>

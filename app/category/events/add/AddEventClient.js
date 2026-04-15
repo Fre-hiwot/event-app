@@ -35,7 +35,6 @@ export default function AddEventClient() {
   const [loading, setLoading] = useState(false);
   const [categoryName, setCategoryName] = useState("");
 
-  // ✅ FIXED: safe query param
   useEffect(() => {
     if (!categoryId) {
       alert("No category selected");
@@ -84,8 +83,9 @@ export default function AddEventClient() {
   async function handleCreateEvent(e) {
     e.preventDefault();
 
-    if (!title || !date || !ticketLimit) {
-      alert("Please fill required fields");
+    // ✅ FIXED REQUIRED CHECK
+    if (!title || !location || !date) {
+      alert("Please fill required fields: title, location, date");
       return;
     }
 
@@ -116,10 +116,11 @@ export default function AddEventClient() {
           description,
           location,
 
+          // ✅ FIXED STRUCTURE (NO nested price)
           price_regular_stages: {
-            early: { price: parseFloat(regularEarly) || 0 },
-            round2: { price: parseFloat(regularRound2) || 0 },
-            round3: { price: parseFloat(regularRound3) || 0 },
+            early: Number(regularEarly || 0),
+            round2: Number(regularRound2 || 0),
+            round3: Number(regularRound3 || 0),
           },
 
           end_date_stages: {
@@ -128,13 +129,13 @@ export default function AddEventClient() {
             round3: round3End || null,
           },
 
-          price_vip: parseFloat(priceVIP) || 0,
-          price_vvip: parseFloat(priceVVIP) || 0,
+          price_vip: Number(priceVIP || 0),
+          price_vvip: Number(priceVVIP || 0),
 
           date,
-          category_id: parseInt(categoryId),
+          category_id: Number(categoryId),
           image_url: imageUrl || null,
-          ticket_limit: parseInt(ticketLimit) || 0,
+          ticket_limit: ticketLimit ? Number(ticketLimit) : null,
         }),
       });
 

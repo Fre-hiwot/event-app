@@ -21,9 +21,6 @@ export default function CategoryEventsClient() {
   const [loading, setLoading] = useState(true);
   const [expandedDesc, setExpandedDesc] = useState({});
 
-  // =========================
-  // INIT
-  // =========================
   useEffect(() => {
     if (!categoryId) {
       router.push("/category");
@@ -66,9 +63,6 @@ export default function CategoryEventsClient() {
     }
   }
 
-  // =========================
-  // FETCH EVENTS
-  // =========================
   async function fetchEvents(userRole, userId) {
     setLoading(true);
 
@@ -104,9 +98,6 @@ export default function CategoryEventsClient() {
     }
   }
 
-  // =========================
-  // ACTIONS
-  // =========================
   const handleCreateEvent = () =>
     router.push(`/category/events/add?category_id=${categoryId}`);
 
@@ -141,9 +132,6 @@ export default function CategoryEventsClient() {
     }
   };
 
-  // =========================
-  // HELPERS
-  // =========================
   const toggleDescription = (id) => {
     setExpandedDesc((prev) => ({
       ...prev,
@@ -163,30 +151,30 @@ export default function CategoryEventsClient() {
 
     const tickets = [];
 
-    const early = Number(stages?.early?.price || 0);
-    const round2 = Number(stages?.round2?.price || 0);
-    const round3 = Number(stages?.round3?.price || 0);
+    const early = Number(stages?.early || 0);
+    const round2 = Number(stages?.round2 || 0);
+    const round3 = Number(stages?.round3 || 0);
 
     if (early > 0 && isActiveTicket(ends.early))
-      tickets.push(`Early ${early} (End: ${formatDate(ends.early)})`);
+      tickets.push(`Early: ${early} (End: ${formatDate(ends.early)})`);
 
     if (round2 > 0 && isActiveTicket(ends.round2))
-      tickets.push(`Round2 ${round2} (End: ${formatDate(ends.round2)})`);
+      tickets.push(`Round2: ${round2} (End: ${formatDate(ends.round2)})`);
 
     if (round3 > 0 && isActiveTicket(ends.round3))
-      tickets.push(`Round3 ${round3} (End: ${formatDate(ends.round3)})`);
+      tickets.push(`Round3: ${round3} (End: ${formatDate(ends.round3)})`);
 
     const vip = Number(ev.price_vip || 0);
     const vvip = Number(ev.price_vvip || 0);
 
-    if (vip > 0) tickets.push(`VIP ${vip}`);
-    if (vvip > 0) tickets.push(`VVIP ${vvip}`);
+    if (vip > 0) tickets.push(`VIP: ${vip}`);
+    if (vvip > 0) tickets.push(`VVIP: ${vvip}`);
 
     if (tickets.length === 0) return <p>Free</p>;
 
     return (
       <div>
-        <strong>Tickets:</strong>
+        <strong>Tickets price:</strong>
         {tickets.map((t, i) => (
           <p key={i}>{t}</p>
         ))}
@@ -194,23 +182,20 @@ export default function CategoryEventsClient() {
     );
   };
 
-  // =========================
-  // UI STATES
-  // =========================
   if (loading) {
-    return <p className={styles["events-loading"]}>Loading events...</p>;
+    return <p className={styles.eventsLoading}>Loading events...</p>;
   }
 
   return (
-    <div className={styles["events-container"]}>
-      <div className={styles["events-header"]}>
-        <h1 className={styles["events-title"]}>
+    <div className={styles.eventsContainer}>
+      <div className={styles.eventsHeader}>
+        <h1 className={styles.eventsTitle}>
           Events in {categoryName}
         </h1>
 
         {(role === ADMIN || role === ORGANIZER) && (
           <button
-            className={styles["events-create-button"]}
+            className={styles.eventsCreateButton}
             onClick={handleCreateEvent}
           >
             Create Event
@@ -219,25 +204,22 @@ export default function CategoryEventsClient() {
       </div>
 
       {events.length === 0 ? (
-        <p className={styles["events-empty"]}>No events found</p>
+        <p className={styles.eventsEmpty}>No events found</p>
       ) : (
-        <div className={styles["events-grid"]}>
+        <div className={styles.eventsGrid}>
           {events.map((ev) => {
             const isExpanded = expandedDesc[ev.id];
             const shortDesc = ev.description?.slice(0, 100) || "";
 
             return (
-              <div key={ev.id} className={styles["event-card"]}>
+              <div key={ev.id} className={styles.eventCard}>
                 <img
                   src={ev.image_url || "/default-event.jpg"}
                   alt={ev.title}
-                  className={styles["event-image"]}
-                  onError={(e) =>
-                    (e.currentTarget.src = "/default-event.jpg")
-                  }
+                  className={styles.eventImage}
                 />
 
-                <h2 className={styles["event-name"]}>{ev.title}</h2>
+                <h2 className={styles.eventName}>{ev.title}</h2>
 
                 {ev.description && (
                   <p>
@@ -247,42 +229,60 @@ export default function CategoryEventsClient() {
                         (ev.description.length > 100 ? "..." : "")}
 
                     {ev.description.length > 100 && (
-                      <button onClick={() => toggleDescription(ev.id)}>
+                      <button className={styles.toggleButton}
+                      onClick={() => toggleDescription(ev.id)}>
                         {isExpanded ? "Less" : "More"}
                       </button>
                     )}
                   </p>
                 )}
 
-                <div style={{ display: "flex", gap: "20px" }}>
+                <div className={styles.eventInfoRow}>
                   <p>
                     <strong>Date:</strong> {formatDate(ev.date)}
                   </p>
                   <p>
                     <strong>Location:</strong> {ev.location}
                   </p>
+
+                  {(role === ADMIN || ev.created_by === userId) && (
+                    <p>
+                      <strong>Total Tickets:</strong>{" "}
+                      {ev.ticket_limit || "Unlimited"}
+                    </p>
+                  )}
                 </div>
 
                 {renderTickets(ev)}
 
-                <div>
-                  {(role === ADMIN || role === ORGANIZER) && (
-                    <>
-                      <button onClick={() => handleEdit(ev.id)}>
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(ev.id)}>
-                        Delete
-                      </button>
-                    </>
-                  )}
-
-                  {role !== ADMIN && (
-                    <button onClick={() => handleBook(ev)}>
-                      Book
+                <div className={styles.eventActions}>
+                {(role === ADMIN || role === ORGANIZER) && (
+                  <>
+                    <button
+                      className={styles.editButton}
+                      onClick={() => handleEdit(ev.id)}
+                    >
+                      Edit
                     </button>
-                  )}
-                </div>
+
+                    <button
+                      className={styles.deleteButton}
+                      onClick={() => handleDelete(ev.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+
+                {role !== ADMIN && (
+                  <button
+                    className={styles.bookButton}
+                    onClick={() => handleBook(ev)}
+                  >
+                    Book
+                  </button>
+                )}
+              </div>
               </div>
             );
           })}

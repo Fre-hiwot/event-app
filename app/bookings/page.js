@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import styles from "../styles/event/eventpage.module.css";
+import styles from "../styles/event/booked.module.css";
 
 export default function BookingsPage() {
   const [eventsSummary, setEventsSummary] = useState([]);
@@ -19,43 +19,14 @@ export default function BookingsPage() {
     fetchBookingsSummary();
   }, []);
 
-  // =========================
-  // CHECK EVENT ACTIVE
-  // =========================
-  const isEventActive = (ev) => {
-    const now = new Date();
-
-    const eventNotExpired =
-      !ev.date || new Date(ev.date) >= now;
-
-    const ends = ev.end_date_stages || {};
-
-    const hasActiveStage = Object.values(ends).some((end) => {
-      if (!end) return true;
-      return new Date(end) >= now;
-    });
-
-    return eventNotExpired && hasActiveStage;
-  };
-
-  // =========================
-  // FETCH SUMMARY
-  // =========================
   async function fetchBookingsSummary() {
     setLoading(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const token = session?.access_token;
+      const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
 
-      if (!user || !token) {
-        alert("Not authenticated");
-        return;
-      }
+      if (!user) return;
 
       const { data: profile } = await supabase
         .from("users")
@@ -77,8 +48,7 @@ export default function BookingsPage() {
           date,
           location,
           image_url,
-          created_by,
-          end_date_stages
+          created_by
         )
       `);
 
@@ -90,146 +60,86 @@ export default function BookingsPage() {
 
       const { data } = await query;
 
-      // ❌ REMOVE EXPIRED EVENTS
-      const activeData = (data || []).filter((b) =>
-        isEventActive(b.events)
-      );
+      const grouped = {};
 
-      let summary = [];
+      (data || []).forEach((b) => {
+        const eid = b.event_id;
+        const status = (b.status || "").toLowerCase();
+        const tickets = Number(b.tickets || 0);
+        const price = Number(b.total_price || 0);
 
-      if (
-        profile.role_id === ADMIN_ROLE ||
-        profile.role_id === ORGANIZER_ROLE
-      ) {
-        const grouped = {};
+        if (!grouped[eid]) {
+          grouped[eid] = {
+            event_id: eid,
+            title: b.events?.title,
+            date: b.events?.date,
+            location: b.events?.location,
+            image_url: b.events?.image_url,
 
-        activeData.forEach((b) => {
-          const eid = b.event_id;
+            totalTickets: 0,
+            confirmedTickets: 0,
+            totalRevenue: 0,
 
-          if (!grouped[eid]) {
-            grouped[eid] = {
-              event_id: eid,
-              title: b.events?.title,
-              date: b.events?.date,
-              location: b.events?.location,
-              image_url: b.events?.image_url,
-              totalTickets: 0,
-              totalRevenue: 0,
-              statusCount: {
-                pending: 0,
-                confirmed: 0,
-                cancelled: 0,
-              },
-            };
-          }
+            statusCount: {
+              pending: 0,
+              confirmed: 0,
+              cancelled: 0,
+            },
+          };
+        }
 
-          const tickets = b.tickets || 0;
-          const status = b.status?.toLowerCase();
+        grouped[eid].totalTickets += tickets;
+        grouped[eid].statusCount[status] =
+          (grouped[eid].statusCount[status] || 0) + tickets;
 
-          grouped[eid].totalTickets += tickets;
-          grouped[eid].totalRevenue += Number(b.total_price) || 0;
+        if (status === "confirmed") {
+          grouped[eid].confirmedTickets += tickets;
+        }
 
-          if (status === "pending")
-            grouped[eid].statusCount.pending += tickets;
-          else if (status === "confirmed")
-            grouped[eid].statusCount.confirmed += tickets;
-          else if (status === "cancelled")
-            grouped[eid].statusCount.cancelled += tickets;
-        });
+        // ✅ FIX: include all paid bookings
+        grouped[eid].totalRevenue += price;
+      });
 
-        summary = Object.values(grouped);
-      } else {
-        const grouped = {};
-
-        activeData.forEach((b) => {
-          const eid = b.event_id;
-
-          if (!grouped[eid]) {
-            grouped[eid] = {
-              event_id: eid,
-              title: b.events?.title,
-              date: b.events?.date,
-              location: b.events?.location,
-              image_url: b.events?.image_url,
-              totalTickets: 0,
-              totalSpent: 0,
-              statusCount: {
-                pending: 0,
-                confirmed: 0,
-                cancelled: 0,
-              },
-            };
-          }
-
-          const tickets = b.tickets || 0;
-          const status = b.status?.toLowerCase();
-
-          grouped[eid].totalTickets += tickets;
-          grouped[eid].totalSpent += Number(b.total_price) || 0;
-
-          if (status === "pending")
-            grouped[eid].statusCount.pending += tickets;
-          else if (status === "confirmed")
-            grouped[eid].statusCount.confirmed += tickets;
-          else if (status === "cancelled")
-            grouped[eid].statusCount.cancelled += tickets;
-        });
-
-        summary = Object.values(grouped);
-      }
-
-      setEventsSummary(summary);
+      setEventsSummary(Object.values(grouped));
     } catch (err) {
-      console.error("FINAL ERROR:", err);
-      alert("Failed to fetch bookings summary");
+      console.error(err);
+      alert("Failed to load bookings");
     } finally {
       setLoading(false);
     }
   }
 
-  // =========================
-  // FILTER
-  // =========================
   const filteredSummary = eventsSummary.filter((e) => {
     const name = e.title?.toLowerCase() || "";
-    const eventDateStr = e.date
-      ? new Date(e.date).toLocaleDateString("en-CA")
-      : "";
+    const dateStr = e.date ? new Date(e.date).toLocaleDateString("en-CA") : "";
 
     return (
       name.includes(search.toLowerCase()) &&
-      (selectedDate ? eventDateStr === selectedDate : true)
+      (selectedDate ? dateStr === selectedDate : true)
     );
   });
 
-  // =========================
-  // UI
-  // =========================
   return (
-    <div className={styles["events-container"]}>
-      <div className={styles["events-header"]}>
-        <h1 className={styles["events-title"]}>
-          {role === ADMIN_ROLE || role === ORGANIZER_ROLE
-            ? "Event Booking Summary"
-            : "My Bookings"}
-        </h1>
+    <div className={styles.eventsContainer}>
+      <div className={styles.eventsHeader}>
+        <h1 className={styles.eventsTitle}>Event Booking Summary</h1>
       </div>
 
       {/* FILTERS */}
-      <div className="flex gap-4 mb-6 flex-wrap">
+      <div className={styles.filters}>
         <input
           type="text"
-          placeholder="Search by event name..."
+          placeholder="Search event..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border p-2 w-full md:w-1/2 rounded"
+          className={styles.input}
         />
 
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="border p-2 rounded"
+          className={styles.input}
         />
 
         <button
@@ -237,7 +147,7 @@ export default function BookingsPage() {
             setSearch("");
             setSelectedDate("");
           }}
-          className="bg-gray-500 text-white px-4 rounded"
+          className={styles.clearBtn}
         >
           Clear
         </button>
@@ -245,55 +155,44 @@ export default function BookingsPage() {
 
       {/* CONTENT */}
       {loading ? (
-        <p className={styles["events-loading"]}>Loading...</p>
+        <p className={styles.loading}>Loading...</p>
       ) : filteredSummary.length === 0 ? (
-        <p className={styles["events-empty"]}>No bookings found</p>
+        <p className={styles.empty}>No bookings found</p>
       ) : (
-        <div className={styles["events-grid"]}>
+        <div className={styles.grid}>
           {filteredSummary.map((e) => (
-            <div key={e.event_id} className={styles["event-card"]}>
+            <div key={e.event_id} className={styles.card}>
               <img
                 src={e.image_url || "/default-event.jpg"}
-                className={styles["event-image"]}
+                className={styles.image}
+                alt={e.title}
               />
 
-              <h2 className={styles["event-name"]}>{e.title}</h2>
+              <h2 className={styles.title}>{e.title}</h2>
 
-              <p>
-                <strong>Location:</strong> {e.location}
+              <p>📍 {e.location}</p>
+              <p>📅 {new Date(e.date).toLocaleDateString()}</p>
+
+              <hr />
+
+              <p>Total Tickets: {e.totalTickets}</p>
+              <p className={styles.confirmed}>
+                Confirmed: {e.confirmedTickets}
               </p>
 
-              <p>
-                <strong>Date:</strong>{" "}
-                {e.date ? new Date(e.date).toLocaleDateString() : "N/A"}
+              <p className={styles.pending}>
+                Pending: {e.statusCount.pending}
               </p>
 
-              {/* TOTAL */}
-              <p><strong>Total Tickets:</strong> {e.totalTickets}</p>
+              <p className={styles.cancelled}>
+                Cancelled: {e.statusCount.cancelled}
+              </p>
 
-              {/* STATUS BREAKDOWN */}
-              <div style={{ marginTop: "8px" }}>
-                <p style={{ color: "#eab308" }}>
-                  Pending: {e.statusCount?.pending || 0}
-                </p>
-                <p style={{ color: "#22c55e" }}>
-                  Confirmed: {e.statusCount?.confirmed || 0}
-                </p>
-                <p style={{ color: "#ef4444" }}>
-                  Cancelled: {e.statusCount?.cancelled || 0}
-                </p>
-              </div>
+              <hr />
 
-              {/* ADMIN / USER FINANCIAL */}
-              {role === ADMIN_ROLE || role === ORGANIZER_ROLE ? (
-                <p>
-                  <strong>Total Revenue:</strong> ${e.totalRevenue}
-                </p>
-              ) : (
-                <p>
-                  <strong>Total Spent:</strong> ${e.totalSpent}
-                </p>
-              )}
+              <p className={styles.revenue}>
+                 Total Revenue: ${e.totalRevenue}
+              </p>
             </div>
           ))}
         </div>
